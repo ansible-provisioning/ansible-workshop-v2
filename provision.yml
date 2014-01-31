@@ -13,7 +13,7 @@
     action: file dest={{ pxe_dir }} state=directory
 
   - name: Extract kernel and ramdisk from ISO image
-    action: iso_extract image={{ image_dir }}/{{ image_file }} files=images/pxeboot/{{ item }} dest={{ pxe_dir }}/{{ item }}
+    action: iso_extract image={{ image_dir }}/{{ image_file }} files=images/pxeboot/{{ item }} dest={{ pxe_dir }}
     with_items:
     - vmlinuz
     - initrd.img
@@ -69,5 +69,5 @@
     delegate_to: "{{ on_host }}"
 
   - name: Wait for the VM to boot
-    action: wait_for host={{ mgt.ip }} port=22 state=started
+    action: wait_for host={{ ip }} port=22 state=started
     delegate_to: "{{ on_host }}"

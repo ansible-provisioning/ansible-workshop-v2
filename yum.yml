@@ -1,0 +1,13 @@
+---
+
+- name: Configure yum
+  hosts: vms
+  user: root
+
+  vars_files:
+  - config.yml
+
+  tasks:
+
+  - name: Configure CentOS mirror
+    action: template src=templates/etc/yum.repos.d/CentOS-Base.repo dest=/etc/yum.repos.d/

@@ -1,7 +1,7 @@
 network --bootproto=static --hostname={{ inventory_hostname }} --ip={{ ip }} --netmask=255.255.255.0 --gateway={{ on_host }} --nameserver={{ on_host }}
-url --url=http://mirror.myip.be/pub/centos/6/os/i386
-#repo --name=base    --baseurl=http://mirror.myip.be/pub/centos/6/os/i386
-#repo --name=updates --baseurl=http://mirror.myip.be/pub/centos/6/updates/i386
+url --url={{ centos_mirror }}/centos/6/os/i386
+#repo --name=base    --baseurl={{ centos_mirror }}/centos/6/os/i386
+#repo --name=updates --baseurl={{ centos_mirror }}/centos/6/updates/i386
 
 services --enabled=network,postfix,rsyslog --disabled=iptables,iptables-ipv6,rawdevices
 

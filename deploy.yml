@@ -1,0 +1,11 @@
+---
+
+- name: Deploy the demo application
+  hosts: web-servers
+  user: root
+
+  tasks:
+
+  - name: Copy all php scripts to the web server
+    action: copy src={{ item }} dest=/var/www/html/ owner=apache group=apache
+    with_fileglob: app/web/*

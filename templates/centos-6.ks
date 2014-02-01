@@ -53,6 +53,9 @@ yum
 httpd
 php
 php-mysql
+
+mysql-server
+MySQL-python
 %end
 
 %post

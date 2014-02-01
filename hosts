@@ -6,3 +6,6 @@ ws01 on_host=192.168.122.1 ip=192.168.122.21
 
 [web-servers]
 ws01
+
+[database-servers]
+ws01

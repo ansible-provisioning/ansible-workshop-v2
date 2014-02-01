@@ -1,5 +1,41 @@
 ---
 
+- name: Prepare deployment
+  hosts: database-servers
+  user: root
+
+  tasks:
+
+  - name: Create a temporary directory for database migratons
+    action: file dest=/tmp/database-migrations state=directory
+
+  - name: Create the database
+    action: mysql_db name=ws state=present
+    register: db_create
+
+  - name: Copy initial schema
+    action: copy src=app/db/initial.sql dest=/tmp/database-migrations/
+    when: db_create|changed
+
+  - name: Initialize database
+    action: mysql_db name=ws state=import target=/tmp/database-migrations/initial.sql
+    when: db_create|changed
+
+- name: Update the database
+  hosts: database-servers
+  user: root
+
+  tasks:
+
+  - name: Create a temporary directory for database migratons
+    action: file dest=/tmp/database-migrations state=directory
+
+  - name: Upload database migrations
+    action: copy src=app/db/migrations.sql dest=/tmp/database-migrations/
+
+  - name: Run database migrations
+    action: mysql_db name=ws state=import target=/tmp/database-migrations/migrations.sql
+
 - name: Deploy the demo application
   hosts: web-servers
   user: root

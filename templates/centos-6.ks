@@ -49,6 +49,10 @@ rsync
 vixie-cron
 which
 yum
+
+httpd
+php
+php-mysql
 %end
 
 %post

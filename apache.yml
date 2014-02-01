@@ -1,0 +1,17 @@
+---
+
+- name: Configure Apache
+  hosts: web-servers
+  user: root
+
+  tasks:
+
+  - name: Install Apache and PHP
+    action: yum pkg={{ item }} state=installed
+    with_items:
+    - httpd
+    - php
+    - php-mysql
+
+  - name: Start Apache
+    action: service name=httpd state=started

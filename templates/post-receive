@@ -1,0 +1,20 @@
+#!/bin/bash
+read oldrev newrev refname
+
+if [[ $refname != "refs/heads/master" ]] ; then
+    ### Only deploy master
+    exit 0
+fi
+
+set -e
+
+DEPLOY=/tmp/ws-deploy
+
+echo "Deploying Ansible Workshop Web Application"
+rm -rf $DEPLOY
+mkdir $DEPLOY
+git clone . $DEPLOY
+cd $DEPLOY
+ansible-playbook deploy.yml -i hosts --private-key=ssh-keys/id_rsa.workshop
+
+set +e

@@ -1,0 +1,21 @@
+---
+
+- name: Set up automatic application deployment repository
+  hosts: vms
+  user: root
+
+  tasks:
+
+  - name: Clone the workshop repository
+    action: git repo=https://github.com/ansible-provisioning/ansible-workshop-v2.git
+                dest=/root/deploy
+                bare=yes
+    ignore_errors: yes
+
+  - name: Update SSH key permissions
+    action: file dest=/root/deploy/ssh-keys/id_rsa.workshop mode=0600
+
+  - name: Add post-receive hook to deploy
+    action: copy src=templates/post-receive
+                 dest=/root/deploy/hooks/
+                 mode=0755

@@ -16,12 +16,6 @@
     action: mysql_db name=ws state=present
     register: db_create
 
-  - name: Create a ws user
-    action: mysql_user name=ws host={{ hostvars[item]["ansible_ssh_host"] }} password=''
-                       priv=ws.*:SELECT state=present
-    with_items:
-    - groups["web-servers"]
-
   - name: Copy initial schema
     action: copy src=app/db/initial.sql dest={{ db_dir }}/
     when: db_create|changed
@@ -29,6 +23,12 @@
   - name: Initialize database
     action: mysql_db name=ws state=import target={{ db_dir }}/initial.sql
     when: db_create|changed
+
+  - name: Create a ws user
+    action: mysql_user name=ws host={{ hostvars[item]["ansible_ssh_host"] }} password=''
+                       priv=ws.*:SELECT state=present
+    with_items:
+    - '{{ groups["web-servers"] }}'
 
   - name: Upload database migrations
     action: copy src=app/db/migrations.sql dest={{ db_dir }}/

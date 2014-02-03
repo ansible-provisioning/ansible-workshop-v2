@@ -1,0 +1,8 @@
+- include: provision.yml
+- include: yum.yml
+- include: apache.yml
+- include: mysql.yml
+- include: ansible.yml
+- include: custom.yml
+#- include: deploy.yml
+- include: auto-deploy.yml

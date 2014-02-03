@@ -6,7 +6,7 @@
 
   tasks:
 
-  - name: Create a temporary directory for database migratons
+  - name: Create a temporary directory for database migrations
     action: file dest=/tmp/database-migrations state=directory
 
   - name: Create the database
@@ -27,7 +27,7 @@
 
   tasks:
 
-  - name: Create a temporary directory for database migratons
+  - name: Create a temporary directory for database migrations
     action: file dest=/tmp/database-migrations state=directory
 
   - name: Upload database migrations

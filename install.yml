@@ -142,8 +142,8 @@
   tasks:
   - action: command poweroff
   - local_action: pause seconds=15
-  - action: fetch src=/var/lib/libvirt/images/vm-noname.img
+  - action: fetch src=/var/lib/libvirt/images/{{ inventory_hostname }}.img
                   dest=./
                   flat=yes
     delegate_to: "{{ on_host }}"
-  - local_action: command qemu-img convert -f qcow2 -O vmdk vm-noname.img vm-noname.vmdk
+  - local_action: command qemu-img convert -f qcow2 -O vmdk {{ inventory_hostname}}.img {{ inventory_hostname}}.vmdk

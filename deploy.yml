@@ -40,8 +40,11 @@
   hosts: web-servers
   user: root
 
+  vars_files:
+  - config.yml
+
   tasks:
 
   - name: Copy all php scripts to the web server
-    action: copy src={{ item }} dest=/var/www/html/ owner=apache group=apache
+    action: copy src={{ item }} dest={{ webapp_dir }}/ owner=apache group=apache
     with_fileglob: app/web/*

@@ -49,6 +49,7 @@ rsync
 vixie-cron
 which
 yum
+vim-enhanced
 
 httpd
 php

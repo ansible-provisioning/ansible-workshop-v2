@@ -9,6 +9,6 @@ Teaching the basics of Ansible through application deployment is the goal of thi
 
 The workshop starts off with a short presentation explaining what Ansible is and what's the motivation behind it.
 
-After that an image is provided to have multiple virtual images which are used in the hands-on session that follows. This image is created with Ansible using the procedure in INSTALL.asciidoc[INSTALL.asciidoc].
+After that an image is provided to have multiple virtual images which are used in the hands-on session that follows. This image is created with Ansible using the procedure in INSTALL.asciidoc.
 
-The hands-on session is explained in workshop.asciidoc[workshop.asciidoc].
+The hands-on session is explained in workshop.asciidoc.

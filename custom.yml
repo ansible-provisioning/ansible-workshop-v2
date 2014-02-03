@@ -9,6 +9,11 @@
                  dest=/etc/sysconfig/network-scripts/ifcfg-eth0
                  mode=0644
 
+  - name: Remove persistent udev rules
+    action: copy src=templates/etc/udev/rules.d/70-persistent-net.rules
+                 dest=/etc/udev/rules.d/70-persistent-net.rules
+                 mode=0644
+
   - name: Set up console 11
     action: copy src=templates/etc/rc.d/rc.local
                  dest=/etc/rc.d/rc.local

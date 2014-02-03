@@ -699,3 +699,150 @@ ok: [ws01] => (item=/root/workshop/app/web/index.php)
 PLAY RECAP ******************************************************************** 
 ws01                       : ok=7    changed=1    unreachable=0    failed=0 
 ----
+
+=== Ignoring errors ===
+
+We can now deploy applications from our management system, which could be you CI system. The typical PaaS allows application deployment through git. That is just a few additional lines of code.
+
+We will add a new directory under `/root` with a bare git repository (i.e. one without working tree). A git post-receive hook runs the application whenever you push to the repository.
+
+----
+---
+
+- name: Set up automatic application deployment repository
+  hosts: vms
+  user: root
+
+  tasks:
+
+  - name: Clone the workshop repository
+    action: git repo=https://github.com/ansible-provisioning/ansible-workshop-v2.git
+                dest=/root/deploy
+                bare=yes
+    ignore_errors: yes
+
+  - name: Update SSH key permissions
+    action: file dest=/root/deploy/ssh-keys/id_rsa.workshop mode=0600
+
+  - name: Add post-receive hook to deploy
+    action: copy src=templates/post-receive
+                 dest=/root/deploy/hooks/
+                 mode=0755
+----
+
+With `--limit` we can run a playbook on a subset of hosts.
+
+Run the new playbook on this host:
+
+----
+[root@ws01 workshop]# ansible-playbook auto-deploy.yml -i hosts --limit=ws01
+
+PLAY [Set up automatic application deployment repository] ********************* 
+
+GATHERING FACTS *************************************************************** 
+ok: [ws01]
+
+TASK: [Clone the workshop repository] ***************************************** 
+changed: [ws01]
+
+TASK: [Update SSH key permissions] ******************************************** 
+ok: [ws01]
+
+TASK: [Add post-receive hook to deploy] *************************************** 
+changed: [ws01]
+
+PLAY RECAP ******************************************************************** 
+ws01                       : ok=4    changed=2    unreachable=0    failed=0
+----
+
+Try to run it again.
+
+----
+TASK: [Clone the workshop repository] ***************************************** 
+failed: [ws01] => {"cmd": "/usr/bin/git ls-remote origin -h refs/heads/master", "failed": true, "rc": 128}
+stderr: fatal: 'origin' does not appear to be a git repository
+fatal: The remote end hung up unexpectedly
+
+msg: fatal: 'origin' does not appear to be a git repository
+fatal: The remote end hung up unexpectedly
+...ignoring
+----
+
+This is something in the Ansible git module that makes incorrect assumptions about bare repositories. It needs to be fixed, but it serves as a good example of the `ignore_errors` directive.
+
+
+=== PaaSy deployment ===
+Add the new repository as a remote of the current repository.
+
+----
+$ git remote add deploy /root/deploy
+----
+
+Now change the title of the application in `app/web/index.php`, commit and:
+
+----
+root@ws01 workshop]# git add app/web/index.php
+[root@ws01 workshop]# git commit -v
+[master 8feb5ee] Update title.
+ Committer: root <root@ws01.(none)>
+Your name and email address were configured automatically based
+on your username and hostname. Please check that they are accurate.
+You can suppress this message by setting them explicitly:
+
+    git config --global user.name "Your Name"
+    git config --global user.email you@example.com
+
+If the identity used for this commit is wrong, you can fix it with:
+
+    git commit --amend --author='Your Name <you@example.com>'
+
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+[root@ws01 workshop]# git push deploy master
+Counting objects: 9, done.
+Delta compression using up to 2 threads.
+Compressing objects: 100% (4/4), done.
+Writing objects: 100% (5/5), 403 bytes, done.
+Total 5 (delta 2), reused 0 (delta 0)
+Unpacking objects: 100% (5/5), done.
+remote: Deploying Ansible Workshop Web Application
+remote: Initialized empty Git repository in /tmp/ws-deploy/.git/
+remote: 
+remote: PLAY [Prepare deployment] ***************************************************** 
+remote: 
+remote: GATHERING FACTS *************************************************************** 
+remote: ok: [ws01]
+remote: 
+remote: TASK: [Create a temporary directory for database migrations] ****************** 
+remote: ok: [ws01]
+remote: 
+remote: TASK: [Create the database] *************************************************** 
+remote: ok: [ws01]
+remote: 
+remote: TASK: [Copy initial schema] *************************************************** 
+remote: skipping: [ws01]
+remote: 
+remote: TASK: [Initialize database] *************************************************** 
+remote: skipping: [ws01]
+remote: 
+remote: PLAY [Update the database] **************************************************** 
+remote: 
+remote: TASK: [Create a temporary directory for database migrations] ****************** 
+remote: ok: [ws01]
+remote: 
+remote: TASK: [Upload database migrations] ******************************************** 
+remote: ok: [ws01]
+remote: 
+remote: TASK: [Run database migrations] *********************************************** 
+remote: changed: [ws01]
+remote: 
+remote: PLAY [Deploy the demo application] ******************************************** 
+remote: 
+remote: TASK: [Copy all php scripts to the web server] ******************************** 
+remote: changed: [ws01] => (item=/tmp/ws-deploy/app/web/index.php)
+remote: 
+remote: PLAY RECAP ******************************************************************** 
+remote: ws01                       : ok=7    changed=2    unreachable=0    failed=0   
+remote: 
+To /root/deploy
+   7874de6..8feb5ee  master -> master
+----

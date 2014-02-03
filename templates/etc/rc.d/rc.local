@@ -9,7 +9,7 @@ touch /var/lock/subsys/local
 if [ "$(hostname)" == "unnamed" ]; then
     IPADDRESS=$(ip -o a show dev eth0 | awk '/inet / { print $4; exit }')
     HOSTNAME=${IPADDRESS##*\.}
-    HOSTNAME="$(hostname) [host${HOSTNAME%/*}]"
+    HOSTNAME="$(hostname) [vm-${HOSTNAME%/*}]"
 else
     HOSTNAME=$(hostname)
 fi

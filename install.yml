@@ -7,7 +7,6 @@
   - config.yml
 
   tasks:
-
   - name: Create temporary directory
     action: file dest={{ pxe_dir }} state=directory
 
@@ -24,10 +23,9 @@
   vars_files:
   - config.yml
 
-  gather_facts: false ### The VM doesn't exist yet
+  gather_facts: no ### The VM doesn't exist yet
 
   tasks:
-
   - name: Create temporary directory
     action: file dest={{ pxe_dir }}/virt-{{ inventory_hostname }} state=directory
     delegate_to: "{{ on_host }}"
@@ -61,7 +59,7 @@
     delegate_to: "{{ on_host }}"
 
   - name: Wait for the VM to stop
-    local_action: pause seconds=60
+    local_action: pause seconds=15
 
   - name: Boot the VM from the hard disk
     action: virt_boot guest={{ inventory_hostname }} boot=hd
@@ -79,7 +77,6 @@
   - config.yml
 
   tasks:
-
   - name: Configure CentOS mirror
     action: template src=templates/etc/yum.repos.d/CentOS-Base.repo dest=/etc/yum.repos.d/
 
@@ -95,7 +92,6 @@
   user: root
 
   tasks:
-
   - name: Install packages
     action: yum pkg={{ item }} state=installed
     with_items:
@@ -139,9 +135,15 @@
                  dest=/etc/rc.d/rc.local
                  mode=0755
 
-#- name: Convert images
-#  hosts: vms
-#  user: root
-#
-#  tasks:
-#  - action:
+- name: Convert and copy images
+  hosts: vms
+  user: root
+
+  tasks:
+  - action: command poweroff
+  - local_action: pause seconds=15
+  - action: fetch src=/var/lib/libvirt/images/vm-noname.img
+                  dest=./
+                  flat=yes
+    delegate_to: "{{ on_host }}"
+  - local_action: command qemu-img convert -f qcow2 -O vmdk vm-noname.img vm-noname.vmdk

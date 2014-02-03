@@ -16,14 +16,27 @@ Slide presentation
 
 == Ad-Hoc Commands ==
 
+=== Using an inventory ===
+Ansible only talks to hosts you want it to talk to. Those hosts are defined in an inventory file.
+
+----
+[ansible@ws01 workshop]$ cat hosts
+[vms]
+vm-master ansible_ssh_host=192.168.122.X
+vm-web ansible_ssh_host=192.168.122.Y
+vm-db ansible_ssh_host=192.168.122.Z
+----
+
+Update the IP addresses to correspond with the ones the systems booted with.
+
 === Testing connectivity ===
 The most straightforward usage of Ansible it to run commands on remote hosts. The +ping+ module checks connectivity and correct python setup.
 
 Let's assume our VM is remote and ping it.
 
 ----
-[root@ws01 workshop]$ ansible ws01 -m ping -i hosts
-ws01 | success >> {
+[root@ws01 workshop]$ ansible vm-master -m ping -i hosts
+vm-master | success >> {
     "changed": false, 
     "ping": "pong"
 }
@@ -33,38 +46,51 @@ The syntax is +ansible <selector> <options>+.
 
 We only want to run it on the local host, so we choose +ws01+ as selector. The module is selected with the +-m+ switch. The +-i hosts+ switch tells Ansible which list of hosts to select from.
 
-=== Using an inventory ===
-Let's check what's in that file.
+We can run this command on multiple hosts by using the group in the inventory:
 
 ----
-[ansible@ws01 workshop]$ cat hosts
-[vms]
-ws01
+[root@ws01 workshop]$ ansible vms -m ping -i hosts
+vm-master | success >> {
+    "changed": false, 
+    "ping": "pong"
+}
+
+vm-web| success >> {
+    "changed": false, 
+    "ping": "pong"
+}
+
+vm-db| success >> {
+    "changed": false, 
+    "ping": "pong"
+}
 ----
 
-I think you know how to let it talk to a second machine.
+== Using modules ==
 
-It really means that we have a group of systems +guests+ with just one system +ws01+ in it.
-
-We can of course also use Ansible to get the contents of the file.
+=== The command module ===
+The `ping` module is useful for testing things, but let's run a generic command on all systems:
 
 ----
-[ansible@ws01 workshop]$ ansible ws01 -m command -a 'cat /home/ansible/workshop/hosts' -i hosts
-ws01 | success | rc=0 >>
-[vms]
-ws01
+[ansible@ws01 workshop]$ ansible vms -m command -a 'date' -i hosts
+vm-master | success | rc=0 >>
+Mon Feb  3 16:31:32 UTC 2014
+
+vm-web | success | rc=0 >>
+Mon Feb  3 16:31:33 UTC 2014
+
+vm-db | success | rc=0 >>
+Mon Feb  3 16:31:33 UTC 2014
 ----
 
 That uses the +command+ module and gives it arguments with +-a+.
-
-== Using modules ==
 
 === Installing packages ===
 The goal of this workshop is to deploy a web application. A useful thing to have in that situation is a web server. Let's use Ansible to make sure Apache is installed and started. This introduces the `yum` and `service` modules.
 
 ----
-[root@ws01 workshop]# ansible ws01 -m yum -a 'pkg=httpd state=installed' -i hosts 
-ws01 | success >> {
+[root@ws01 workshop]# ansible vm-web -m yum -a 'pkg=httpd state=installed' -i hosts 
+vm-web | success >> {
     "changed": false, 
     "msg": "", 
     "rc": 0, 
@@ -80,8 +106,8 @@ Great. Apache was already installed on the system. Notice the arguments to the `
 Let's start Apache.
 
 ----
-[root@ws01 workshop]# ansible ws01 -m service -a 'name=httpd state=started enabled=yes' -i hosts 
-ws01 | success >> {
+[root@ws01 workshop]# ansible vm-web -m service -a 'name=httpd state=started enabled=yes' -i hosts 
+vm-web | success >> {
     "changed": false, 
     "enabled": true, 
     "name": "httpd", 
@@ -94,34 +120,34 @@ The service module is one of the two distribution agnostic modules (with user). 
 Another thing to notice is the `yes` argument to the `enabled` parameter. Boolean parameters in Ansible are `yes` and `no`.
 
 == Inventory Groups ==
-The application we want to deploy is multi-tiered. There is the web server part and the database part. It makes sense to be able to run commands on all web servers.
+The application we want to deploy is multi-tiered. There is the web server part and the database part. It makes sense to be able to group hosts in functional groups.
 
 The built-in inventory can do that:
 
 ----
 [vms]
-ws01
+vm-master ansible_ssh_host=192.168.122.X
+vm-web ansible_ssh_host=192.168.122.Y
+vm-db ansible_ssh_host=192.168.122.Z
 
 [web-servers]
-ws01
+vm-web
 
 [database-servers]
-ws01
+vm-db
 ----
-
-In this case the ws01 virtual machine will have both roles.
 
 == Playbooks ==
 Running commands on potentially hundreds of systems is nice, but it does not scale as your infrastructure grows. We need a way to describe the system state. Ansible playbooks provide a declarative way to do just that.
 
 Playbooks are written in YAML. One playbook consists of one or more plays. Each play has a number of tasks. Playbooks are run sequentially. This allows orchestration of actions on multiple system groups.
 
+NOTE: Explain YAML here using slides
+
 === Creating your first playbook ===
 Let's show an example that ensures Apache is installed and running.
 
 ----
----
-
 - name: Configure Apache
   hosts: web-servers
   user: root
@@ -139,7 +165,7 @@ This playbook has one play. In that play are two tasks.
 
 A play always indicates on which hosts it will run and as what user. Many more parameters are possible, but this is the minimum. Well, you could skip the user, but then it will run as your local user.
 
-We've updated the `hosts` file to include a second group `web-servers`. Our `ws01` system is in that group.
+We've updated the `hosts` file to include a second group `web-servers`. Our `vm-web` system is in that group.
 
 You can run a playbook like this:
 
@@ -149,16 +175,16 @@ You can run a playbook like this:
 PLAY [Configure Apache] ******************************************************* 
 
 GATHERING FACTS *************************************************************** 
-ok: [ws01]
+ok: [vm-web]
 
 TASK: [Install Apache] ******************************************************** 
-ok: [ws01]
+ok: [vm-web]
 
 TASK: [Start and Enable Apache] *********************************************** 
-ok: [ws01]
+ok: [vm-web]
 
 PLAY RECAP ******************************************************************** 
-ws01                       : ok=3    changed=0    unreachable=0    failed=0 
+vm-web                     : ok=3    changed=0    unreachable=0    failed=0 
 ----
 
 You will notice this playbook runs both tasks and has an additional step to gather facts. This step gathers facts from the system. These facts are available as variables in the remainder of the play.
@@ -169,8 +195,8 @@ You will notice this playbook runs both tasks and has an additional step to gath
 Let's see which facts are available:
 
 ----
-[root@ws01 workshop]# ansible ws01 -m setup -i hosts 
-ws01 | success >> {
+[root@ws01 workshop]# ansible vm-web -m setup -i hosts 
+vm-web | success >> {
     "ansible_facts": {
         "ansible_all_ipv4_addresses": [
             "192.168.122.21"
@@ -390,14 +416,14 @@ ws01 | success >> {
 
 When the fact you need is not in there, you can also return your own facts.
 
+NOTE: explain -vvv
+
 === Managing Configuration Files ===
 When managing configuration files you often want to use certain variables in your file. That way one can reuse the same file template for multiple systems.
 
 Let's configure a virtual host on Apache for the web application we want to deploy.
 
 ----
----
-
 - name: Configure Apache
   hosts: web-servers
   user: root
@@ -416,7 +442,7 @@ Let's configure a virtual host on Apache for the web application we want to depl
     action: yum pkg=httpd state=installed
 
   - name: Add webapp vhost
-    action: template src=templates/etc/httpd/conf.d/webapp.conf dest=/etc/httpd/conf.d/
+    action: template src=templates/webapp.conf dest=/etc/httpd/conf.d/
     notify:
     - restart Apache
 
@@ -439,36 +465,36 @@ We use our newly defined `webapp_dir` variable and a magic `inventory_hostname` 
 
 Of course, if we ever change the configuration again, we want to restart Apache so it picks up the new config. This can be done with handlers and notify. A handler is a normal named task that is run when the task that has it in notify returns changed.
 
+NOTE: Add ansible_managed to template
+
 ----
 [root@ws01 workshop]# ansible-playbook apache.yml -i hosts
 
 PLAY [Configure Apache] ******************************************************* 
 
 GATHERING FACTS *************************************************************** 
-ok: [ws01]
+ok: [vm-web]
 
 TASK: [Install Apache] ******************************************************** 
-ok: [ws01]
+ok: [vm-web]
 
 TASK: [Add webapp vhost] ****************************************************** 
-changed: [ws01]
+changed: [vm-web]
 
 TASK: [Start and Enable Apache] *********************************************** 
-changed: [ws01]
+changed: [vm-web]
 
 NOTIFIED: [restart Apache] **************************************************** 
-changed: [ws01]
+changed: [vm-web]
 
 PLAY RECAP ******************************************************************** 
-ws01                       : ok=5    changed=3    unreachable=0    failed=0
+vm-web                       : ok=5    changed=3    unreachable=0    failed=0
 ----
 
 === Using with_items ===
 Our web application uses MySQL. For managing MySQL databases with Ansible, the `MySQL-Python` module is needed. We could use two tasks to install MySQL and the python module, but there is some syntactic sugar that helps.
 
 ----
----
-
 - name: Configure MySQL
   hosts: database-servers
   user: root
@@ -493,16 +519,16 @@ The `item` variable contains the current item.
 PLAY [Configure MySQL] ******************************************************** 
 
 GATHERING FACTS *************************************************************** 
-ok: [ws01]
+ok: [vm-db]
 
 TASK: [Install MySQL] ********************************************************* 
-ok: [ws01] => (item=mysql-server,MySQL-python)
+ok: [vm-db] => (item=mysql-server,MySQL-python)
 
 TASK: [Start MySQL] *********************************************************** 
-ok: [ws01]
+ok: [vm-db]
 
 PLAY RECAP ******************************************************************** 
-ws01                       : ok=3    changed=0    unreachable=0    failed=0
+vm-db                       : ok=3    changed=0    unreachable=0    failed=0
 ----
 
 We want to be able to talk to MySQL in the web application we'll soon write in PHP. Use the `with_items` syntax to change the Apache installation playbook to install PHP and the MySQL extension.
@@ -512,7 +538,6 @@ We want to be able to talk to MySQL in the web application we'll soon write in P
     action: yum pkg={{ item }} state=installed
     with_items:
     - httpd
-    - php
     - php-mysql
 ----
 
@@ -522,8 +547,6 @@ With the web server and the database up and running, we can start deploying the 
 Let's first consider the case where the system is fresh. In that case we want to create a database and populate it with initial data. In subsequent reruns, we don't want to populate the database.
 
 ----
----
-
 - name: Prepare deployment
   hosts: database-servers
   user: root
@@ -531,19 +554,25 @@ Let's first consider the case where the system is fresh. In that case we want to
   tasks:
 
   - name: Create a temporary directory for database migratons
-    action: file dest=/tmp/database-migrations state=directory
+    action: file dest=/tmp/db state=directory
 
   - name: Create the database
     action: mysql_db name=ws state=present
     register: db_create
 
   - name: Copy initial schema
-    action: copy src=app/db/initial.sql dest=/tmp/database-migrations/
+    action: copy src=app/db/initial.sql dest=/tmp/db/
     when: db_create|changed
 
   - name: Initialize database
-    action: mysql_db name=ws state=import target=/tmp/database-migrations/initial.sql
+    action: mysql_db name=ws state=import target=/tmp/db/initial.sql
     when: db_create|changed
+
+  - name: Create a ws user
+    action: mysql_user name=ws host={{ hostvars[item]["ansible_ssh_host"] }} password=''
+                       priv=ws.*:SELECT state=present
+    with_items:
+    - groups["web-servers"]
 ----
 
 This introduces a few new modules.
@@ -568,7 +597,9 @@ Now we can deploy the application. We will do it in a quick and dirty way, by ju
   tasks:
 
   - name: Copy all php scripts to the web server
-    action: copy src={{ item }} dest={{ webapp_dir }}/ owner=apache group=apache
+    action: copy src={{ item }}
+                 dest={{ webapp_dir }}/
+                 owner=apache group=apache
     with_fileglob: app/web/*
 ----
 
@@ -606,43 +637,41 @@ Application developers have the nasty habit of not being able to come up with a 
 This makes our complete deployment playbook:
 
 ----
----
-
 - name: Prepare deployment
   hosts: database-servers
   user: root
 
+  vars:
+    db_dir: /tmp/db
+
   tasks:
 
-  - name: Create a temporary directory for database migratons
-    action: file dest=/tmp/database-migrations state=directory
+  - name: Create a temporary directory for database migrations
+    action: file dest={{ db_dir }} state=directory
 
   - name: Create the database
     action: mysql_db name=ws state=present
     register: db_create
 
+  - name: Create a ws user
+    action: mysql_user name=ws host={{ hostvars[item]["ansible_ssh_host"] }} password=''
+                       priv=ws.*:SELECT state=present
+    with_items:
+    - groups["web-servers"]
+
   - name: Copy initial schema
-    action: copy src=app/db/initial.sql dest=/tmp/database-migrations/
+    action: copy src=app/db/initial.sql dest={{ db_dir }}/
     when: db_create|changed
 
   - name: Initialize database
-    action: mysql_db name=ws state=import target=/tmp/database-migrations/initial.sql
+    action: mysql_db name=ws state=import target={{ db_dir }}/initial.sql
     when: db_create|changed
 
-- name: Update the database
-  hosts: database-servers
-  user: root
-
-  tasks:
-
-  - name: Create a temporary directory for database migratons
-    action: file dest=/tmp/database-migrations state=directory
-
   - name: Upload database migrations
-    action: copy src=app/db/migrations.sql dest=/tmp/database-migrations/
+    action: copy src=app/db/migrations.sql dest={{ db_dir }}/
 
   - name: Run database migrations
-    action: mysql_db name=ws state=import target=/tmp/database-migrations/migrations.sql
+    action: mysql_db name=ws state=import target={{ db_dir }}/migrations.sql
 
 - name: Deploy the demo application
   hosts: web-servers
@@ -707,22 +736,17 @@ We can now deploy applications from our management system, which could be you CI
 We will add a new directory under `/root` with a bare git repository (i.e. one without working tree). A git post-receive hook runs the application whenever you push to the repository.
 
 ----
----
-
 - name: Set up automatic application deployment repository
-  hosts: vms
+  hosts: vm-master
   user: root
 
   tasks:
 
   - name: Clone the workshop repository
-    action: git repo=https://github.com/ansible-provisioning/ansible-workshop-v2.git
+    action: git repo=/root/workshop
                 dest=/root/deploy
                 bare=yes
     ignore_errors: yes
-
-  - name: Update SSH key permissions
-    action: file dest=/root/deploy/ssh-keys/id_rsa.workshop mode=0600
 
   - name: Add post-receive hook to deploy
     action: copy src=templates/post-receive
@@ -730,29 +754,24 @@ We will add a new directory under `/root` with a bare git repository (i.e. one w
                  mode=0755
 ----
 
-With `--limit` we can run a playbook on a subset of hosts.
-
-Run the new playbook on this host:
+Run the new playbook:
 
 ----
-[root@ws01 workshop]# ansible-playbook auto-deploy.yml -i hosts --limit=ws01
+[root@ws01 workshop]# ansible-playbook auto-deploy.yml -i hosts
 
 PLAY [Set up automatic application deployment repository] ********************* 
 
 GATHERING FACTS *************************************************************** 
-ok: [ws01]
+ok: [vm-master]
 
 TASK: [Clone the workshop repository] ***************************************** 
-changed: [ws01]
-
-TASK: [Update SSH key permissions] ******************************************** 
-ok: [ws01]
+changed: [vm-master]
 
 TASK: [Add post-receive hook to deploy] *************************************** 
-changed: [ws01]
+changed: [vm-master]
 
 PLAY RECAP ******************************************************************** 
-ws01                       : ok=4    changed=2    unreachable=0    failed=0
+vm-master                   : ok=4    changed=2    unreachable=0    failed=0
 ----
 
 Try to run it again.
@@ -810,38 +829,38 @@ remote:
 remote: PLAY [Prepare deployment] ***************************************************** 
 remote: 
 remote: GATHERING FACTS *************************************************************** 
-remote: ok: [ws01]
+remote: ok: [vm-db]
 remote: 
 remote: TASK: [Create a temporary directory for database migrations] ****************** 
-remote: ok: [ws01]
+remote: ok: [vm-db]
 remote: 
 remote: TASK: [Create the database] *************************************************** 
-remote: ok: [ws01]
+remote: ok: [vm-db]
 remote: 
 remote: TASK: [Copy initial schema] *************************************************** 
-remote: skipping: [ws01]
+remote: skipping: [vm-db]
 remote: 
 remote: TASK: [Initialize database] *************************************************** 
-remote: skipping: [ws01]
+remote: skipping: [vm-db]
 remote: 
 remote: PLAY [Update the database] **************************************************** 
 remote: 
 remote: TASK: [Create a temporary directory for database migrations] ****************** 
-remote: ok: [ws01]
+remote: ok: [vm-db]
 remote: 
 remote: TASK: [Upload database migrations] ******************************************** 
-remote: ok: [ws01]
+remote: ok: [vm-db]
 remote: 
 remote: TASK: [Run database migrations] *********************************************** 
-remote: changed: [ws01]
+remote: changed: [vm-db]
 remote: 
 remote: PLAY [Deploy the demo application] ******************************************** 
 remote: 
 remote: TASK: [Copy all php scripts to the web server] ******************************** 
-remote: changed: [ws01] => (item=/tmp/ws-deploy/app/web/index.php)
+remote: changed: [vm-web] => (item=/tmp/ws-deploy/app/web/index.php)
 remote: 
 remote: PLAY RECAP ******************************************************************** 
-remote: ws01                       : ok=7    changed=2    unreachable=0    failed=0   
+remote: vm-db                       : ok=7    changed=2    unreachable=0    failed=0   
 remote: 
 To /root/deploy
    7874de6..8feb5ee  master -> master

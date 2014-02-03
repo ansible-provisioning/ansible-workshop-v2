@@ -4,37 +4,37 @@
   hosts: database-servers
   user: root
 
+  vars:
+    db_dir: /tmp/db
+
   tasks:
 
   - name: Create a temporary directory for database migrations
-    action: file dest=/tmp/database-migrations state=directory
+    action: file dest={{ db_dir }} state=directory
 
   - name: Create the database
     action: mysql_db name=ws state=present
     register: db_create
 
+  - name: Create a ws user
+    action: mysql_user name=ws host={{ hostvars[item]["ansible_ssh_host"] }} password=''
+                       priv=ws.*:SELECT state=present
+    with_items:
+    - groups["web-servers"]
+
   - name: Copy initial schema
-    action: copy src=app/db/initial.sql dest=/tmp/database-migrations/
+    action: copy src=app/db/initial.sql dest={{ db_dir }}/
     when: db_create|changed
 
   - name: Initialize database
-    action: mysql_db name=ws state=import target=/tmp/database-migrations/initial.sql
+    action: mysql_db name=ws state=import target={{ db_dir }}/initial.sql
     when: db_create|changed
 
-- name: Update the database
-  hosts: database-servers
-  user: root
-
-  tasks:
-
-  - name: Create a temporary directory for database migrations
-    action: file dest=/tmp/database-migrations state=directory
-
   - name: Upload database migrations
-    action: copy src=app/db/migrations.sql dest=/tmp/database-migrations/
+    action: copy src=app/db/migrations.sql dest={{ db_dir }}/
 
   - name: Run database migrations
-    action: mysql_db name=ws state=import target=/tmp/database-migrations/migrations.sql
+    action: mysql_db name=ws state=import target={{ db_dir }}/migrations.sql
 
 - name: Deploy the demo application
   hosts: web-servers

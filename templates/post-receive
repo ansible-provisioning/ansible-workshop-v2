@@ -15,6 +15,6 @@ rm -rf $DEPLOY
 mkdir $DEPLOY
 git clone . $DEPLOY
 cd $DEPLOY
-ansible-playbook deploy.yml -i hosts --private-key=ssh-keys/id_rsa.workshop
+ansible-playbook deploy.yml -i hosts
 
 set +e

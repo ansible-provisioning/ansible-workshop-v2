@@ -18,7 +18,6 @@
     action: yum pkg={{ item }} state=installed
     with_items:
     - httpd
-    - php
     - php-mysql
 
   - name: Add webapp vhost

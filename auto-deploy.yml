@@ -1,7 +1,7 @@
 ---
 
 - name: Set up automatic application deployment repository
-  hosts: vms
+  hosts: vm-master
   user: root
 
   tasks:
@@ -11,9 +11,6 @@
                 dest=/root/deploy
                 bare=yes
     ignore_errors: yes
-
-  - name: Update SSH key permissions
-    action: file dest=/root/deploy/ssh-keys/id_rsa.workshop mode=0600
 
   - name: Add post-receive hook to deploy
     action: copy src=templates/post-receive

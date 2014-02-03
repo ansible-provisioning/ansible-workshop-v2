@@ -1,0 +1,436 @@
+Ansible Workshop v2
+===================
+
+Dag Wieers and Jeroen Hoekx
+v0.1, Feb 2014
+
+== Introduction ==
+Teaching the basics of Ansible through application deployment is the goal of this workshop.
+
+We'll start with a short presentation before we move into the hands-on part.
+
+== Setup ==
+A virtual machine is provided. Log in using user `root` and password `root`. By default the IP address is 192.168.122.21. This is in the standard libvirtd default network.
+
+The virtual machine is created using Ansible. Run the `provision.yml` playbook to configure it. That playbook assumes the CentOS live installation image is available in `/var/lib/libvirt/images/` and a directory `/tmp/ks` is available through HTTP on port 8000. Use `$ python2 -m SimpleHTTPServer` to do that in an easy way.
+
+== Ad-Hoc Commands ==
+The most straightforward usage of Ansible it to run commands on remote hosts. The +ping+ module checks connectivity and correct python setup.
+
+Let's assume our VM is remote and ping it.
+
+----
+[root@ws01 workshop]$ ansible ws01 -m ping -i hosts
+ws01 | success >> {
+    "changed": false, 
+    "ping": "pong"
+}
+----
+
+The syntax is +ansible <selector> <options>+.
+
+We only want to run it on the local host, so we choose +ws01+ as selector. The module is selected with the +-m+ switch. The +-i hosts+ switch tells Ansible which list of hosts to select from.
+
+Let's check what's in that file.
+
+----
+[ansible@ws01 workshop]$ cat hosts
+[vms]
+ws01
+----
+
+I think you know how to let it talk to a second machine.
+
+It really means that we have a group of systems +guests+ with just one system +ws01+ in it.
+
+We can of course also use Ansible to get the contents of the file.
+
+----
+[ansible@ws01 workshop]$ ansible ws01 -m command -a 'cat /home/ansible/workshop/hosts' -i hosts
+ws01 | success | rc=0 >>
+[vms]
+ws01
+----
+
+That uses the +command+ module and gives it arguments with +-a+.
+
+== Starting System Services ==
+The goal of this workshop is to deploy a web application. A useful thing to have in that situation is a web server. Let's use Ansible to make sure Apache is installed and started. This introduces the `yum` and `service` modules.
+
+----
+[root@ws01 workshop]# ansible ws01 -m yum -a 'pkg=httpd state=installed' -i hosts 
+ws01 | success >> {
+    "changed": false, 
+    "msg": "", 
+    "rc": 0, 
+    "results": [
+        "httpd-2.2.15-29.el6.centos.i686 providing httpd is already installed"
+    ]
+}
+----
+
+Great. Apache was already installed on the system. Notice the arguments to the `yum` module. The `state` parameter is used by virtually every Ansible module.
+
+Let's start Apache.
+
+----
+[root@ws01 workshop]# ansible ws01 -m service -a 'name=httpd state=started enabled=yes' -i hosts 
+ws01 | success >> {
+    "changed": false, 
+    "enabled": true, 
+    "name": "httpd", 
+    "state": "started"
+}
+----
+
+The service module is one of the two distribution agnostic modules (with user). Package managers for example differ too much in their functionality to have one baseline module.
+
+Another thing to notice is the `yes` argument to the `enabled` parameter. Boolean parameters in Ansible are `yes` and `no`.
+
+== Playbooks ==
+Running those commands on potentially hundreds of systems is nice, but it does not scale as your infrastructure grows. We need a way to describe the system state. Ansible playbooks provide a declarative way to do just that.
+
+Playbooks are written in YAML. One playbook consists of one or more plays. Each play has a number of tasks. Playbooks are run sequentially. This allows orchestration of actions on multiple system groups.
+
+Let's show an example that ensures Apache is installed and running.
+
+----
+---
+
+- name: Configure Apache
+  hosts: web-servers
+  user: root
+
+  tasks:
+
+  - name: Install Apache
+    action: yum pkg=httpd state=installed
+
+  - name: Start and Enable Apache
+    action: service name=httpd state=started enabled=yes
+----
+
+This playbook has one play. In that play are two tasks.
+
+A play always indicates on which hosts it will run and as what user. Many more parameters are possible, but this is the minimum. Well, you could skip the user, but then it will run as your local user.
+
+We've updated the `hosts` file to include a second group `web-servers`. Our `ws01` system is in that group.
+
+You can run a playbook like this:
+
+----
+[root@ws01 workshop]# ansible-playbook apache.yml -i hosts
+
+PLAY [Configure Apache] ******************************************************* 
+
+GATHERING FACTS *************************************************************** 
+ok: [ws01]
+
+TASK: [Install Apache] ******************************************************** 
+ok: [ws01]
+
+TASK: [Start and Enable Apache] *********************************************** 
+ok: [ws01]
+
+PLAY RECAP ******************************************************************** 
+ws01                       : ok=3    changed=0    unreachable=0    failed=0 
+----
+
+You will notice this playbook runs both tasks and has an additional step to gather facts. This step gathers facts from the system. These facts are available as variables in the remainder of the play.
+
+Let's see which facts are available:
+
+----
+[root@ws01 workshop]# ansible ws01 -m setup -i hosts 
+ws01 | success >> {
+    "ansible_facts": {
+        "ansible_all_ipv4_addresses": [
+            "192.168.122.21"
+        ], 
+        "ansible_all_ipv6_addresses": [
+            "fe80::5054:ff:fe23:1614"
+        ], 
+        "ansible_architecture": "i386", 
+        "ansible_bios_date": "01/01/2011", 
+        "ansible_bios_version": "Bochs", 
+        "ansible_cmdline": {
+            "KEYBOARDTYPE": "pc", 
+            "KEYTABLE": "us", 
+            "LANG": "en_US.UTF-8", 
+            "SYSFONT": "latarcyrheb-sun16", 
+            "quiet": true, 
+            "rd_LVM_LV": "vg_ws01_root/lv_swap", 
+            "rd_NO_DM": true, 
+            "rd_NO_LUKS": true, 
+            "rd_NO_MD": true, 
+            "rhgb": true, 
+            "ro": true, 
+            "root": "/dev/mapper/vg_ws01_root-lv_root"
+        }, 
+        "ansible_date_time": {
+            "date": "2014-02-03", 
+            "day": "03", 
+            "epoch": "1391415917", 
+            "hour": "08", 
+            "iso8601": "2014-02-03T08:25:17Z", 
+            "iso8601_micro": "2014-02-03T08:25:17.248371Z", 
+            "minute": "25", 
+            "month": "02", 
+            "second": "17", 
+            "time": "08:25:17", 
+            "tz": "UTC", 
+            "tz_offset": "+0000", 
+            "year": "2014"
+        }, 
+        "ansible_default_ipv4": {
+            "address": "192.168.122.21", 
+            "alias": "eth0", 
+            "gateway": "192.168.122.1", 
+            "interface": "eth0", 
+            "macaddress": "52:54:00:23:16:14", 
+            "mtu": 1500, 
+            "netmask": "255.255.255.0", 
+            "network": "192.168.122.0", 
+            "type": "ether"
+        }, 
+        "ansible_default_ipv6": {}, 
+        "ansible_devices": {
+            "sr0": {
+                "holders": [], 
+                "host": "", 
+                "model": "QEMU DVD-ROM", 
+                "partitions": {}, 
+                "removable": "1", 
+                "rotational": "1", 
+                "scheduler_mode": "cfq", 
+                "sectors": "2097151", 
+                "sectorsize": "512", 
+                "size": "1024.00 MB", 
+                "support_discard": "0", 
+                "vendor": "QEMU"
+            }, 
+            "vda": {
+                "holders": [], 
+                "host": "", 
+                "model": null, 
+                "partitions": {
+                    "vda1": {
+                        "sectors": "409600", 
+                        "sectorsize": 512, 
+                        "size": "200.00 MB", 
+                        "start": "2048"
+                    }, 
+                    "vda2": {
+                        "sectors": "5879808", 
+                        "sectorsize": 512, 
+                        "size": "2.80 GB", 
+                        "start": "411648"
+                    }
+                }, 
+                "removable": "0", 
+                "rotational": "1", 
+                "scheduler_mode": "cfq", 
+                "sectors": "6291456", 
+                "sectorsize": "512", 
+                "size": "3.00 GB", 
+                "support_discard": "0", 
+                "vendor": "6900"
+            }
+        }, 
+        "ansible_distribution": "CentOS", 
+        "ansible_distribution_release": "Final", 
+        "ansible_distribution_version": "6.5", 
+        "ansible_domain": "", 
+        "ansible_env": {
+            "G_BROKEN_FILENAMES": "1", 
+            "HOME": "/root", 
+            "LANG": "C", 
+            "LESSOPEN": "|/usr/bin/lesspipe.sh %s", 
+            "LOGNAME": "root", 
+            "MAIL": "/var/mail/root", 
+            "PATH": "/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin", 
+            "PWD": "/root", 
+            "SHELL": "/bin/bash", 
+            "SHLVL": "2", 
+            "SSH_CLIENT": "192.168.122.21 37293 22", 
+            "SSH_CONNECTION": "192.168.122.21 37293 192.168.122.21 22", 
+            "USER": "root", 
+            "_": "/usr/bin/python"
+        }, 
+        "ansible_eth0": {
+            "active": true, 
+            "device": "eth0", 
+            "ipv4": {
+                "address": "192.168.122.21", 
+                "netmask": "255.255.255.0", 
+                "network": "192.168.122.0"
+            }, 
+            "ipv4_secondaries": [], 
+            "ipv6": [
+                {
+                    "address": "fe80::5054:ff:fe23:1614", 
+                    "prefix": "64", 
+                    "scope": "link"
+                }
+            ], 
+            "macaddress": "52:54:00:23:16:14", 
+            "module": "virtio_net", 
+            "mtu": 1500, 
+            "promisc": false, 
+            "type": "ether"
+        }, 
+        "ansible_form_factor": "Other", 
+        "ansible_fqdn": "ws01", 
+        "ansible_hostname": "ws01", 
+        "ansible_interfaces": [
+            "lo", 
+            "eth0"
+        ], 
+        "ansible_kernel": "2.6.32-431.el6.i686", 
+        "ansible_lo": {
+            "active": true, 
+            "device": "lo", 
+            "ipv4": {
+                "address": "127.0.0.1", 
+                "netmask": "255.0.0.0", 
+                "network": "127.0.0.0"
+            }, 
+            "ipv4_secondaries": [], 
+            "ipv6": [
+                {
+                    "address": "::1", 
+                    "prefix": "128", 
+                    "scope": "host"
+                }
+            ], 
+            "mtu": 16436, 
+            "promisc": false, 
+            "type": "loopback"
+        }, 
+        "ansible_machine": "i686", 
+        "ansible_memfree_mb": 375, 
+        "ansible_memtotal_mb": 498, 
+        "ansible_mounts": [
+            {
+                "device": "/dev/mapper/vg_ws01_root-lv_root", 
+                "fstype": "ext4", 
+                "mount": "/", 
+                "options": "rw,noatime", 
+                "size_available": 1166802944, 
+                "size_total": 2113748992
+            }, 
+            {
+                "device": "/dev/vda1", 
+                "fstype": "ext4", 
+                "mount": "/boot", 
+                "options": "rw,noatime", 
+                "size_available": 165210112, 
+                "size_total": 203097088
+            }
+        ], 
+        "ansible_os_family": "RedHat", 
+        "ansible_pkg_mgr": "yum", 
+        "ansible_processor": [
+            "QEMU Virtual CPU version 1.7.0", 
+            "QEMU Virtual CPU version 1.7.0"
+        ], 
+        "ansible_processor_cores": 1, 
+        "ansible_processor_count": 2, 
+        "ansible_processor_threads_per_core": 1, 
+        "ansible_processor_vcpus": 2, 
+        "ansible_product_name": "Bochs", 
+        "ansible_product_serial": "NA", 
+        "ansible_product_uuid": "D17F90A9-2961-401A-ABF2-67A4986DB05A", 
+        "ansible_product_version": "NA", 
+        "ansible_python_version": "2.6.6", 
+        "ansible_selinux": false, 
+        "ansible_ssh_host_key_dsa_public": "AAAAB3NzaC1kc3MAAACBAPEyQcsdKho53k1iGNPovQZcZfWtdKNXszZlhFl64YbSI6hYHmJVLPnQLrsl4wyjrOk49HFsSIM89wAipEHqvr+X3jKOR3PyEIZbeE5B6BKeP8CmDs9Xp7BIyJnwdcJk6w0gOd17nTbjQ4sJDo4FSacTFw5lxTF+8Xq0O9ErJtzBAAAAFQCib5Lo+HBK2iJpHWXLyUqZZzRKQQAAAIEAzHm7CURjGo9geYcvFTsIRvn2GwMqj4TdS2usv4KwhxUl/46a1Jh9/Gp9OZuNNcentUJQGccJf8gIYBVtFA0PcXcuAp6DS4kdk52bhTL+jRARCTb5aXJFUfSZNw5u/E4AhNW9domtiDiu2zEuY+LpMiUDLUSlmRC+BBQkA11dNAsAAACATlZw4Jr1IouATvxdtt+qqG3WrOz82wYcOAVDx8NFAzbFAcUeRswzt9+yWsn1CytTnOtbMwS2psTPIvtYvW8SKDvzlqBrBIUVgJgDVALBRffQ2YIl0XmSNjxZkgz8xvOCbvDFTzBKxbEqgn/0g7XLmfcEQeJvltikyVU4gTc//xU=", 
+        "ansible_ssh_host_key_rsa_public": "AAAAB3NzaC1yc2EAAAABIwAAAQEAqWaeArbN0cZDpm7CX8UnQwF1t8fjm0IDRQIBpbJN21kdvwEppVYCJZw/W+oo66fVyUCRPgI83VeLlqgvObxOQYzUAdfbaEp7yUMelp9wwx1c6PnzbsOWg/lDPW5kXLobKSmECP985cMUFpwb2pA8CjcwhQsS4EIQwZgxIYBqV5MTufLtGTnD3v0qzyRQ7l35srKC4myHL04fk+W4F0+qy2B/gMeY1ViKl/AbIvwO1deZ47Xn1Ier/k7Ou57c9WE6M7z5fl6dBzT6YJzgMEjSdy6U5zV+lYbay5CtSn0rRbiOnKqrhZl8EC0L/+W1DpCeDieikbCKQu0WX7liN3uVJQ==", 
+        "ansible_swapfree_mb": 511, 
+        "ansible_swaptotal_mb": 511, 
+        "ansible_system": "Linux", 
+        "ansible_system_vendor": "Bochs", 
+        "ansible_user_id": "root", 
+        "ansible_userspace_architecture": "i386", 
+        "ansible_userspace_bits": "32", 
+        "ansible_virtualization_role": "guest", 
+        "ansible_virtualization_type": "kvm"
+    }, 
+    "changed": false
+}
+----
+
+When the fact you need is not in there, you can also return your own facts.
+
+== Managing Configuration Files ==
+When managing configuration files you often want to use certain variables in your file. That way one can reuse the same file template for multiple systems.
+
+Let's configure a virtual host on Apache for the web application we want to deploy.
+
+----
+---
+
+- name: Configure Apache
+  hosts: web-servers
+  user: root
+
+  vars:
+    webapp_dir: /var/www/html
+
+  handlers:
+
+  - name: restart Apache
+    action: service name=httpd state=restarted
+
+  tasks:
+
+  - name: Install Apache
+    action: yum pkg=httpd state=installed
+
+  - name: Add webapp vhost
+    action: template src=templates/etc/httpd/conf.d/webapp.conf dest=/etc/httpd/conf.d/
+    notify:
+    - restart Apache
+
+  - name: Start and Enable Apache
+    action: service name=httpd state=started enabled=yes
+----
+
+Two things are new here. The first one is the template module. This module allows templating a configuration file using the jinja2 templating language (also used in Flask).
+
+The template is simple. It looks like this:
+
+----
+<VirtualHost *:80>
+    ServerName {{ inventory_hostname }}
+    DocumentRoot {{ webapp_dir }}
+</VirtualHost>
+----
+
+We use our newly defined `webapp_dir` variable and a magic `inventory_hostname` variable. The `webapp_dir` variable is defined in the `vars` section in the playbook. We'll look into other ways to define them later.
+
+Of course, if we ever change the configuration again, we want to restart Apache so it picks up the new config. This can be done with handlers and notify. A handler is a normal named task that is run when the task that has it in notify returns changed.
+
+----
+[root@ws01 workshop]# ansible-playbook apache.yml -i hosts
+
+PLAY [Configure Apache] ******************************************************* 
+
+GATHERING FACTS *************************************************************** 
+ok: [ws01]
+
+TASK: [Install Apache] ******************************************************** 
+ok: [ws01]
+
+TASK: [Add webapp vhost] ****************************************************** 
+changed: [ws01]
+
+TASK: [Start and Enable Apache] *********************************************** 
+changed: [ws01]
+
+NOTIFIED: [restart Apache] **************************************************** 
+changed: [ws01]
+
+PLAY RECAP ******************************************************************** 
+ws01                       : ok=5    changed=3    unreachable=0    failed=0
+----

@@ -103,8 +103,12 @@
     - ansible
 
   - name: Clone the workshop repository
-    action: git repo=https://github.com/ansible-provisioning/ansible-workshop-v2.git
+    action: git repo=https://github.com/ansible-provisioning/workshop-deployment-participant.git
                 dest=/root/workshop
+
+  - name: Clone the complete workshop repository
+    action: git repo=https://github.com/ansible-provisioning/ansible-workshop-v2.git
+                dest=/root/complete
 
   - name: Copy SSH key to root
     action: copy src=ssh-keys/id_rsa.workshop dest=/root/.ssh/id_rsa mode=0600

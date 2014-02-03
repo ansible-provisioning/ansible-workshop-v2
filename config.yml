@@ -2,4 +2,5 @@ pxe_dir: /tmp/centos-pxe
 image_dir: /var/lib/libvirt/images
 image_file: CentOS-6.5-i386-netinstall.iso
 web_dir: /tmp/ks ### serve this with $ python -m SimpleHTTPServer
+webapp_dir: /var/www/html
 centos_mirror: http://mirror.myip.be/pub

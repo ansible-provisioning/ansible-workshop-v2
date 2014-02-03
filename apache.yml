@@ -4,6 +4,14 @@
   hosts: web-servers
   user: root
 
+  vars_files:
+  - config.yml
+
+  handlers:
+
+  - name: restart Apache
+    action: service name=httpd state=restarted
+
   tasks:
 
   - name: Install Apache and PHP
@@ -12,6 +20,11 @@
     - httpd
     - php
     - php-mysql
+
+  - name: Add webapp vhost
+    action: template src=templates/etc/httpd/conf.d/webapp.conf dest=/etc/httpd/conf.d/
+    notify:
+    - restart Apache
 
   - name: Start Apache
     action: service name=httpd state=started enabled=yes

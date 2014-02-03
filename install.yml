@@ -1,8 +1,143 @@
-- include: provision.yml
-- include: yum.yml
-- include: apache.yml
-- include: mysql.yml
-- include: ansible.yml
-- include: custom.yml
-#- include: deploy.yml
-- include: auto-deploy.yml
+---
+- name: Prepare host for provisioning
+  hosts: workshop-hosts
+  user: root
+
+  vars_files:
+  - config.yml
+
+  tasks:
+
+  - name: Create temporary directory
+    action: file dest={{ pxe_dir }} state=directory
+
+  - name: Extract kernel and ramdisk from ISO image
+    action: iso_extract image={{ image_dir }}/{{ image_file }} files=images/pxeboot/{{ item }} dest={{ pxe_dir }}
+    with_items:
+    - vmlinuz
+    - initrd.img
+
+- name: Provision a CentOS system
+  hosts: vms
+  user: root
+
+  vars_files:
+  - config.yml
+
+  gather_facts: false ### The VM doesn't exist yet
+
+  tasks:
+
+  - name: Create temporary directory
+    action: file dest={{ pxe_dir }}/virt-{{ inventory_hostname }} state=directory
+    delegate_to: "{{ on_host }}"
+
+  - name: Template VM configuration
+    action: template src=templates/vm.xml dest={{ pxe_dir }}/virt-{{ inventory_hostname }}/vm.xml
+    delegate_to: "{{ on_host }}"
+
+  - name: Allocate storage
+    action: qemu_img dest={{ image_dir }}/{{ inventory_hostname }}.img size=3072 format=qcow2
+    delegate_to: "{{ on_host }}"
+
+  - name: Create the VM
+    action: virt_guest guest={{ inventory_hostname }} src={{ pxe_dir }}/virt-{{ inventory_hostname }}/vm.xml
+    delegate_to: "{{ on_host }}"
+
+  - name: Template the kickstart file
+    action: template src=templates/centos-6.ks dest={{ web_dir }}/{{ inventory_hostname }}.ks mode=0755
+    delegate_to: "{{ on_host }}"
+
+  - name: Direct kernel boot the VM
+    action: virt_boot guest={{ inventory_hostname }} kernel={{ pxe_dir }}/vmlinuz initrd={{ pxe_dir }}/initrd.img cmdline='linux sshd ksdevice=eth0 ip={{ ansible_ssh_host }} netmask=255.255.255.0 gateway={{ on_host }} ks=http://{{ on_host }}:8000/{{ inventory_hostname }}.ks'
+    delegate_to: "{{ on_host }}"
+
+  - name: Wait for the VM to start
+    action: wait_for host={{ ansible_ssh_host }} port=22 state=started
+    delegate_to: "{{ on_host }}"
+
+  - name: Wait for the kickstart to finish
+    action: wait_for host={{ ansible_ssh_host }} port=22 state=stopped timeout=7200
+    delegate_to: "{{ on_host }}"
+
+  - name: Wait for the VM to stop
+    local_action: pause seconds=60
+
+  - name: Boot the VM from the hard disk
+    action: virt_boot guest={{ inventory_hostname }} boot=hd
+    delegate_to: "{{ on_host }}"
+
+  - name: Wait for the VM to boot
+    action: wait_for host={{ ansible_ssh_host }} port=22 state=started
+    delegate_to: "{{ on_host }}"
+
+- name: Configure yum
+  hosts: vms
+  user: root
+
+  vars_files:
+  - config.yml
+
+  tasks:
+
+  - name: Configure CentOS mirror
+    action: template src=templates/etc/yum.repos.d/CentOS-Base.repo dest=/etc/yum.repos.d/
+
+  - name: Download EPEL
+    action: get_url url=http://epel.mirror.nucleus.be/6/i386/epel-release-6-8.noarch.rpm dest=/tmp/
+
+  - name: Install EPEL
+    action: shell rpm -ivh /tmp/epel-release-6-8.noarch.rpm
+    ignore_errors: yes
+
+- name: Install Ansible
+  hosts: vms
+  user: root
+
+  tasks:
+
+  - name: Install packages
+    action: yum pkg={{ item }} state=installed
+    with_items:
+    - git
+    - ansible
+
+  - name: Clone the workshop repository
+    action: git repo=https://github.com/ansible-provisioning/ansible-workshop-v2.git
+                dest=/root/workshop
+
+  - name: Copy SSH key to root
+    action: copy src=ssh-keys/id_rsa.workshop dest=/root/.ssh/id_rsa mode=0600
+
+- name: Customize our image
+  hosts: vms
+  user: root
+
+  tasks:
+  - name: Configure DHCP
+    action: copy src=templates/etc/sysconfig/network-scripts/ifcfg-eth0
+                 dest=/etc/sysconfig/network-scripts/ifcfg-eth0
+                 mode=0644
+
+  - name: Remove persistent udev rules
+    action: copy src=templates/etc/udev/rules.d/70-persistent-net.rules
+                 dest=/etc/udev/rules.d/70-persistent-net.rules
+                 mode=0644
+
+  - name: Disable persistent udev rules generator
+    action: file src=/dev/null
+                 dest=/etc/udev/rules.d/75-persistent-net-generator.rules 
+                 state=link
+                 mode=0644
+
+  - name: Set up console 11
+    action: copy src=templates/etc/rc.d/rc.local
+                 dest=/etc/rc.d/rc.local
+                 mode=0755
+
+#- name: Convert images
+#  hosts: vms
+#  user: root
+#
+#  tasks:
+#  - action:

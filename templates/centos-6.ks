@@ -1,9 +1,9 @@
-network --bootproto=static --hostname={{ inventory_hostname }} --ip={{ ip }} --netmask=255.255.255.0 --gateway={{ on_host }} --nameserver={{ on_host }}
+network --bootproto=static --hostname={{ inventory_hostname }} --ip={{ ansible_ssh_host }} --netmask=255.255.255.0 --gateway={{ on_host }} --nameserver={{ on_host }}
 url --url={{ centos_mirror }}/centos/6/os/i386
 #repo --name=base    --baseurl={{ centos_mirror }}/centos/6/os/i386
 #repo --name=updates --baseurl={{ centos_mirror }}/centos/6/updates/i386
 
-services --enabled=network,postfix,rsyslog --disabled=iptables,iptables-ipv6,rawdevices
+services --enabled=network,postfix,rsyslog --disabled=httpd,iptables,ip6tables,mysqld,netfs,rawdevices
 
 install
 text

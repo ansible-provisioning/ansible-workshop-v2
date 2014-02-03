@@ -5,7 +5,7 @@
 unnamed ansible_ssh_host=192.168.122.244 on_host=192.168.122.1
 
 [web-servers]
-ws01
+unnamed
 
 [database-servers]
-ws01
+unnamed

@@ -6,8 +6,8 @@
 
 touch /var/lock/subsys/local
 
+IPADDRESS=$(ip -o a show dev eth0 | awk '/inet / { print $4; exit }')
 if [ "$(hostname)" == "vm-noname" ]; then
-    IPADDRESS=$(ip -o a show dev eth0 | awk '/inet / { print $4; exit }')
     HOSTNAME=${IPADDRESS##*\.}
     HOSTNAME="$(hostname) [vm-${HOSTNAME%/*}]"
 else

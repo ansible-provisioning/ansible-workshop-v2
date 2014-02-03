@@ -16,7 +16,7 @@ fi
 
 clear >/dev/tty11
 cat <<EOF >/dev/tty11
-Welcome to your Ansible Workshop virtual machine
+Welcome to your Ansible Workshop virtual machine !
 
 Hostname: $HOSTNAME
 IP Address: $IPADDRESS

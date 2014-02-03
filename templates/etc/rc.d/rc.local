@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+# This script will be executed *after* all the other init scripts.
+# You can put your own initialization stuff in here if you don't
+# want to do the full Sys V style init stuff.
+
+touch /var/lock/subsys/local
+
+if [ "$(hostname)" == "unnamed" ]; then
+    IPADDRESS=$(ip -o a show dev eth0 | awk '/inet / { print $4; exit }')
+    HOSTNAME=${IPADDRESS##*\.}
+    HOSTNAME="$(hostname) [host${HOSTNAME%/*}]"
+else
+    HOSTNAME=$(hostname)
+fi
+
+clear >/dev/tty11
+cat <<EOF >/dev/tty11
+Welcome to your Ansible Workshop virtual machine
+
+Hostname: $HOSTNAME
+IP Address: $IPADDRESS
+EOF
+chvt 11

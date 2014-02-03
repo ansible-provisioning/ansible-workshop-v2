@@ -7,7 +7,7 @@
   tasks:
 
   - name: Clone the workshop repository
-    action: git repo=https://github.com/ansible-provisioning/ansible-workshop-v2.git
+    action: git repo=/root/workshop
                 dest=/root/deploy
                 bare=yes
     ignore_errors: yes

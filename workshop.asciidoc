@@ -93,8 +93,26 @@ The service module is one of the two distribution agnostic modules (with user). 
 
 Another thing to notice is the `yes` argument to the `enabled` parameter. Boolean parameters in Ansible are `yes` and `no`.
 
+== Inventory Groups ==
+The application we want to deploy is multi-tiered. There is the web server part and the database part. It makes sense to be able to run commands on all web servers.
+
+The built-in inventory can do that:
+
+----
+[vms]
+ws01
+
+[web-servers]
+ws01
+
+[database-servers]
+ws01
+----
+
+In this case the ws01 virtual machine will have both roles.
+
 == Playbooks ==
-Running those commands on potentially hundreds of systems is nice, but it does not scale as your infrastructure grows. We need a way to describe the system state. Ansible playbooks provide a declarative way to do just that.
+Running commands on potentially hundreds of systems is nice, but it does not scale as your infrastructure grows. We need a way to describe the system state. Ansible playbooks provide a declarative way to do just that.
 
 Playbooks are written in YAML. One playbook consists of one or more plays. Each play has a number of tasks. Playbooks are run sequentially. This allows orchestration of actions on multiple system groups.
 
@@ -443,4 +461,241 @@ changed: [ws01]
 
 PLAY RECAP ******************************************************************** 
 ws01                       : ok=5    changed=3    unreachable=0    failed=0
+----
+
+=== Using with_items ===
+Our web application uses MySQL. For managing MySQL databases with Ansible, the `MySQL-Python` module is needed. We could use two tasks to install MySQL and the python module, but there is some syntactic sugar that helps.
+
+----
+---
+
+- name: Configure MySQL
+  hosts: database-servers
+  user: root
+
+  tasks:
+
+  - name: Install MySQL
+    action: yum pkg={{ item }} state=installed
+    with_items:
+    - mysql-server
+    - MySQL-python
+
+  - name: Start MySQL
+    action: service name=mysqld state=started enabled=yes
+----
+
+The `item` variable contains the current item.
+
+----
+[root@ws01 workshop]# ansible-playbook mysql.yml -i hosts
+
+PLAY [Configure MySQL] ******************************************************** 
+
+GATHERING FACTS *************************************************************** 
+ok: [ws01]
+
+TASK: [Install MySQL] ********************************************************* 
+ok: [ws01] => (item=mysql-server,MySQL-python)
+
+TASK: [Start MySQL] *********************************************************** 
+ok: [ws01]
+
+PLAY RECAP ******************************************************************** 
+ws01                       : ok=3    changed=0    unreachable=0    failed=0
+----
+
+We want to be able to talk to MySQL in the web application we'll soon write in PHP. Use the `with_items` syntax to change the Apache installation playbook to install PHP and the MySQL extension.
+
+----
+  - name: Install Apache and PHP
+    action: yum pkg={{ item }} state=installed
+    with_items:
+    - httpd
+    - php
+    - php-mysql
+----
+
+=== Using results of previous tasks ===
+With the web server and the database up and running, we can start deploying the application.
+
+Let's first consider the case where the system is fresh. In that case we want to create a database and populate it with initial data. In subsequent reruns, we don't want to populate the database.
+
+----
+---
+
+- name: Prepare deployment
+  hosts: database-servers
+  user: root
+
+  tasks:
+
+  - name: Create a temporary directory for database migratons
+    action: file dest=/tmp/database-migrations state=directory
+
+  - name: Create the database
+    action: mysql_db name=ws state=present
+    register: db_create
+
+  - name: Copy initial schema
+    action: copy src=app/db/initial.sql dest=/tmp/database-migrations/
+    when: db_create|changed
+
+  - name: Initialize database
+    action: mysql_db name=ws state=import target=/tmp/database-migrations/initial.sql
+    when: db_create|changed
+----
+
+This introduces a few new modules.
+
+We are mostly interested in the first `mysql_db` task. That task uses the `register` keyword. This stores the results of that task in the variable `db_create`.
+
+=== Conditionals ===
+
+The last two tasks use the `when` keyword. A task will only run when the condition in `when` is true. In this case we use the built-in jinja2 filter `changed` to only run that task when the task that registered `db_create` did change the system.
+
+=== Globbing files ===
+Now we can deploy the application. We will do it in a quick and dirty way, by just copying everything in a particular folder...
+
+----
+- name: Deploy the demo application
+  hosts: web-servers
+  user: root
+
+  vars:
+    webapp_dir: /var/www/html
+
+  tasks:
+
+  - name: Copy all php scripts to the web server
+    action: copy src={{ item }} dest={{ webapp_dir }}/ owner=apache group=apache
+    with_fileglob: app/web/*
+----
+
+This uses the `with_fileglob` lookup plugin, which provides exactly the functionality you'd expect it to have.
+
+=== Including variables from files ===
+That last play feels wrong. We've defined the `webapp_dir` variable here. We also defined the variable in the Apache playbook. When the webapp location changes we have to remember to change it in two places.
+
+There is a better solution: including variables from files.
+
+----
+- name: Deploy the demo application
+  hosts: web-servers
+  user: root
+
+  vars_files:
+  - config.yml
+
+  tasks:
+
+  - name: Copy all php scripts to the web server
+    action: copy src={{ item }} dest={{ webapp_dir }}/ owner=apache group=apache
+    with_fileglob: app/web/*
+----
+
+`config.yml` contains:
+
+----
+webapp_dir: /var/www/html
+----
+
+=== Working with database migrations ===
+Application developers have the nasty habit of not being able to come up with a good data model. They require database schema changes with every deployment. This complicates the whole deployment process and makes rollbacks incredibly hard. We will do as every professional PaaS does, or even more, and allow only forward migrations.
+
+This makes our complete deployment playbook:
+
+----
+---
+
+- name: Prepare deployment
+  hosts: database-servers
+  user: root
+
+  tasks:
+
+  - name: Create a temporary directory for database migratons
+    action: file dest=/tmp/database-migrations state=directory
+
+  - name: Create the database
+    action: mysql_db name=ws state=present
+    register: db_create
+
+  - name: Copy initial schema
+    action: copy src=app/db/initial.sql dest=/tmp/database-migrations/
+    when: db_create|changed
+
+  - name: Initialize database
+    action: mysql_db name=ws state=import target=/tmp/database-migrations/initial.sql
+    when: db_create|changed
+
+- name: Update the database
+  hosts: database-servers
+  user: root
+
+  tasks:
+
+  - name: Create a temporary directory for database migratons
+    action: file dest=/tmp/database-migrations state=directory
+
+  - name: Upload database migrations
+    action: copy src=app/db/migrations.sql dest=/tmp/database-migrations/
+
+  - name: Run database migrations
+    action: mysql_db name=ws state=import target=/tmp/database-migrations/migrations.sql
+
+- name: Deploy the demo application
+  hosts: web-servers
+  user: root
+
+  vars_files:
+  - config.yml
+
+  tasks:
+
+  - name: Copy all php scripts to the web server
+    action: copy src={{ item }} dest={{ webapp_dir }}/ owner=apache group=apache
+    with_fileglob: app/web/*
+----
+
+This playbook has three plays. They are run sequentially.
+
+----
+[root@ws01 workshop]# ansible-playbook deploy.yml -i hosts
+
+PLAY [Prepare deployment] ***************************************************** 
+
+GATHERING FACTS *************************************************************** 
+ok: [ws01]
+
+TASK: [Create a temporary directory for database migrations] ******************* 
+ok: [ws01]
+
+TASK: [Create the database] *************************************************** 
+ok: [ws01]
+
+TASK: [Copy initial schema] *************************************************** 
+skipping: [ws01]
+
+TASK: [Initialize database] *************************************************** 
+skipping: [ws01]
+
+PLAY [Update the database] **************************************************** 
+
+TASK: [Create a temporary directory for database migrations] ******************* 
+ok: [ws01]
+
+TASK: [Upload database migrations] ******************************************** 
+ok: [ws01]
+
+TASK: [Run database migrations] *********************************************** 
+changed: [ws01]
+
+PLAY [Deploy the demo application] ******************************************** 
+
+TASK: [Copy all php scripts to the web server] ******************************** 
+ok: [ws01] => (item=/root/workshop/app/web/index.php)
+
+PLAY RECAP ******************************************************************** 
+ws01                       : ok=7    changed=1    unreachable=0    failed=0 
 ----

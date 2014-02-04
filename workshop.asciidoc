@@ -27,7 +27,7 @@ vm-web ansible_ssh_host=192.168.122.Y
 vm-db ansible_ssh_host=192.168.122.Z
 ----
 
-Update the IP addresses to correspond with the ones the systems booted with.
+You can see the IP address distributed by your hypervisor-specific DHCP on the console of each VM. Update the IP addresses to correspond with the ones the systems booted with.
 
 === Testing connectivity ===
 The most straightforward usage of Ansible it to run commands on remote hosts. The +ping+ module checks connectivity and correct python setup.
@@ -35,7 +35,7 @@ The most straightforward usage of Ansible it to run commands on remote hosts. Th
 Let's assume our VM is remote and ping it.
 
 ----
-[root@ws01 workshop]$ ansible vm-master -m ping -i hosts
+[root@vm-master workshop]# ansible vm-master -m ping -i hosts
 vm-master | success >> {
     "changed": false, 
     "ping": "pong"
@@ -44,12 +44,12 @@ vm-master | success >> {
 
 The syntax is +ansible <selector> <options>+.
 
-We only want to run it on the local host, so we choose +ws01+ as selector. The module is selected with the +-m+ switch. The +-i hosts+ switch tells Ansible which list of hosts to select from.
+We only want to run it on the local host, so we choose +vm-master+ as selector. The module is selected with the +-m+ switch. The +-i hosts+ switch tells Ansible which inventory file to use.
 
 We can run this command on multiple hosts by using the group in the inventory:
 
 ----
-[root@ws01 workshop]$ ansible vms -m ping -i hosts
+[root@vm-master workshop]# ansible vms -m ping -i hosts
 vm-master | success >> {
     "changed": false, 
     "ping": "pong"
@@ -72,7 +72,7 @@ vm-db| success >> {
 The `ping` module is useful for testing things, but let's run a generic command on all systems:
 
 ----
-[ansible@ws01 workshop]$ ansible vms -m command -a 'date' -i hosts
+[root@vm-master workshop]# ansible vms -m command -a 'date' -i hosts 
 vm-master | success | rc=0 >>
 Mon Feb  3 16:31:32 UTC 2014
 
@@ -89,7 +89,7 @@ That uses the +command+ module and gives it arguments with +-a+.
 The goal of this workshop is to deploy a web application. A useful thing to have in that situation is a web server. Let's use Ansible to make sure Apache is installed and started. This introduces the `yum` and `service` modules.
 
 ----
-[root@ws01 workshop]# ansible vm-web -m yum -a 'pkg=httpd state=installed' -i hosts 
+[root@vm-master workshop]# ansible vm-web -m yum -a 'pkg=httpd state=installed' -i hosts
 vm-web | success >> {
     "changed": false, 
     "msg": "", 
@@ -106,7 +106,7 @@ Great. Apache was already installed on the system. Notice the arguments to the `
 Let's start Apache.
 
 ----
-[root@ws01 workshop]# ansible vm-web -m service -a 'name=httpd state=started enabled=yes' -i hosts 
+[root@vm-master workshop]# ansible vm-web -m service -a 'name=httpd state=started enabled=yes' -i hosts
 vm-web | success >> {
     "changed": false, 
     "enabled": true, 
@@ -170,7 +170,7 @@ We've updated the `hosts` file to include a second group `web-servers`. Our `vm-
 You can run a playbook like this:
 
 ----
-[root@ws01 workshop]# ansible-playbook apache.yml -i hosts
+[root@vm-master workshop]# ansible-playbook apache.yml -i hosts 
 
 PLAY [Configure Apache] ******************************************************* 
 
@@ -184,15 +184,14 @@ TASK: [Start and Enable Apache] ***********************************************
 ok: [vm-web]
 
 PLAY RECAP ******************************************************************** 
-vm-web                     : ok=3    changed=0    unreachable=0    failed=0 
+vm-web                     : ok=3    changed=0    unreachable=0    failed=0
 ----
 
-You will notice this playbook runs both tasks and has an additional step to gather facts. This step gathers facts from the system. These facts are available as variables in the remainder of the play.
-
+You will notice this playbook runs both tasks and has an additional step to gather facts. These facts are available as variables in the remainder of the play.
 
 === Gathering facts ===
 
-Let's see which facts are available:
+Let's see which facts are available. The +setup+ module is used to gather them.
 
 ----
 [root@ws01 workshop]# ansible vm-web -m setup -i hosts 
@@ -416,12 +415,132 @@ vm-web | success >> {
 
 When the fact you need is not in there, you can also return your own facts.
 
-NOTE: explain -vvv
+=== Under the hood ===
+Running the playbook with additional verbosity is possible with the +-v+ flag. Adding one +v+ show the output you would get when running a task with `ansible`.
+
+Adding more +v+s, up to three, increases the verbosity. It shows you exactly which SSH commands are run in the background.
+
+----
+[root@vm-master workshop]# ansible-playbook apache.yml -i hosts -vvv
+
+PLAY [Configure Apache] ******************************************************* 
+
+GATHERING FACTS *************************************************************** 
+<192.168.122.44> ESTABLISH CONNECTION FOR USER: root on PORT 22 TO 192.168.122.44
+<192.168.122.44> EXEC /bin/sh -c 'mkdir -p $HOME/.ansible/tmp/ansible-1391536177.48-154519686540036 && echo $HOME/.ansible/tmp/ansible-1391536177.48-154519686540036'
+<192.168.122.44> REMOTE_MODULE setup 
+<192.168.122.44> PUT /tmp/tmpbeGxa0 TO /root/.ansible/tmp/ansible-1391536177.48-154519686540036/setup
+<192.168.122.44> EXEC /bin/sh -c '/usr/bin/python /root/.ansible/tmp/ansible-1391536177.48-154519686540036/setup; rm -rf /root/.ansible/tmp/ansible-1391536177.48-154519686540036/ >/dev/null 2>&1'
+ok: [vm-web]
+
+TASK: [Install Apache] ******************************************************** 
+<192.168.122.44> ESTABLISH CONNECTION FOR USER: root on PORT 22 TO 192.168.122.44
+<192.168.122.44> EXEC /bin/sh -c 'mkdir -p $HOME/.ansible/tmp/ansible-1391536177.87-158335554738395 && echo $HOME/.ansible/tmp/ansible-1391536177.87-158335554738395'
+<192.168.122.44> REMOTE_MODULE yum pkg=httpd state=installed
+<192.168.122.44> PUT /tmp/tmpWFxgYv TO /root/.ansible/tmp/ansible-1391536177.87-158335554738395/yum
+<192.168.122.44> EXEC /bin/sh -c '/usr/bin/python -tt /root/.ansible/tmp/ansible-1391536177.87-158335554738395/yum; rm -rf /root/.ansible/tmp/ansible-1391536177.87-158335554738395/ >/dev/null 2>&1'
+ok: [vm-web] => {"changed": false, "msg": "", "rc": 0, "results": ["httpd-2.2.15-29.el6.centos.i686 providing httpd is already installed"]}
+
+TASK: [Start and Enable Apache] *********************************************** 
+<192.168.122.44> ESTABLISH CONNECTION FOR USER: root on PORT 22 TO 192.168.122.44
+<192.168.122.44> EXEC /bin/sh -c 'mkdir -p $HOME/.ansible/tmp/ansible-1391536178.35-83838710451863 && echo $HOME/.ansible/tmp/ansible-1391536178.35-83838710451863'
+<192.168.122.44> REMOTE_MODULE service name=httpd state=started enabled=yes
+<192.168.122.44> PUT /tmp/tmpWOsgaK TO /root/.ansible/tmp/ansible-1391536178.35-83838710451863/service
+<192.168.122.44> PUT /tmp/tmpmofo2w TO /root/.ansible/tmp/ansible-1391536178.35-83838710451863/arguments
+<192.168.122.44> EXEC /bin/sh -c '/usr/bin/python /root/.ansible/tmp/ansible-1391536178.35-83838710451863/service /root/.ansible/tmp/ansible-1391536178.35-83838710451863/arguments; rm -rf /root/.ansible/tmp/ansible-1391536178.35-83838710451863/ >/dev/null 2>&1'
+ok: [vm-web] => {"changed": false, "enabled": true, "name": "httpd", "state": "started"}
+
+PLAY RECAP ******************************************************************** 
+vm-web                     : ok=3    changed=0    unreachable=0    failed=0
+----
+
+=== Configuring a default inventory ===
+Up to now we've always used the +-i+ switch to the `ansible` and `ansible-playbook` commands. We can configure a default.
+
+Add a file `ansible.cfg` in the `/root/workshop/` directory with these contents:
+
+----
+[root@vm-master workshop]# cat ansible.cfg 
+[defaults]
+hostfile       = hosts
+----
+
+A full list of options can be found in `/etc/ansible/ansible.cfg`.
 
 === Managing Configuration Files ===
 When managing configuration files you often want to use certain variables in your file. That way one can reuse the same file template for multiple systems.
 
 Let's configure a virtual host on Apache for the web application we want to deploy.
+
+----
+- name: Configure Apache
+  hosts: web-servers
+  user: root
+
+  vars:
+    webapp_dir: /var/www/html
+
+  tasks:
+
+  - name: Install Apache
+    action: yum pkg=httpd state=installed
+
+  - name: Add webapp vhost
+    action: template src=templates/webapp.conf dest=/etc/httpd/conf.d/
+
+  - name: Start and Enable Apache
+    action: service name=httpd state=started enabled=yes
+----
+
+This playbook shows the template module. This module allows templating a configuration file using the jinja2 templating language (also used in Flask).
+
+The template is simple. It looks like this:
+
+----
+<VirtualHost *:80>
+    ServerName {{ inventory_hostname }}
+    DocumentRoot {{ webapp_dir }}
+</VirtualHost>
+----
+
+We use our newly defined `webapp_dir` variable and a magic `inventory_hostname` variable. The `webapp_dir` variable is defined in the `vars` section in the playbook. We'll look into other ways to define them later.
+
+When you run it, the output is:
+
+----
+[root@vm-master workshop]# ansible-playbook apache.yml 
+
+PLAY [Configure Apache] ******************************************************* 
+
+GATHERING FACTS *************************************************************** 
+ok: [vm-web]
+
+TASK: [Install Apache] ******************************************************** 
+ok: [vm-web]
+
+TASK: [Add webapp vhost] ****************************************************** 
+changed: [vm-web]
+
+TASK: [Start and Enable Apache] *********************************************** 
+ok: [vm-web]
+
+PLAY RECAP ******************************************************************** 
+vm-web                     : ok=4    changed=1    unreachable=0    failed=0
+----
+
+Of course, we would have wanted a restart of Apache to apply the new config. This can be done with handlers and notify. A handler is a normal named task that is run when the task that has it in notify returns changed.
+
+Let's update the template and add a comment using the magic `ansible_managed` variable to it:
+
+----
+# {{ ansible_managed }}
+<VirtualHost *:80>
+    ServerName {{ inventory_hostname }}
+    DocumentRoot {{ webapp_dir }}
+</VirtualHost>
+----
+
+Add the handler to the playbook and use `notify` to register the handler.
 
 ----
 - name: Configure Apache
@@ -450,25 +569,10 @@ Let's configure a virtual host on Apache for the web application we want to depl
     action: service name=httpd state=started enabled=yes
 ----
 
-Two things are new here. The first one is the template module. This module allows templating a configuration file using the jinja2 templating language (also used in Flask).
-
-The template is simple. It looks like this:
+When we run it:
 
 ----
-<VirtualHost *:80>
-    ServerName {{ inventory_hostname }}
-    DocumentRoot {{ webapp_dir }}
-</VirtualHost>
-----
-
-We use our newly defined `webapp_dir` variable and a magic `inventory_hostname` variable. The `webapp_dir` variable is defined in the `vars` section in the playbook. We'll look into other ways to define them later.
-
-Of course, if we ever change the configuration again, we want to restart Apache so it picks up the new config. This can be done with handlers and notify. A handler is a normal named task that is run when the task that has it in notify returns changed.
-
-NOTE: Add ansible_managed to template
-
-----
-[root@ws01 workshop]# ansible-playbook apache.yml -i hosts
+[root@vm-master workshop]# ansible-playbook apache.yml 
 
 PLAY [Configure Apache] ******************************************************* 
 
@@ -482,13 +586,25 @@ TASK: [Add webapp vhost] ******************************************************
 changed: [vm-web]
 
 TASK: [Start and Enable Apache] *********************************************** 
-changed: [vm-web]
+ok: [vm-web]
 
 NOTIFIED: [restart Apache] **************************************************** 
 changed: [vm-web]
 
 PLAY RECAP ******************************************************************** 
-vm-web                       : ok=5    changed=3    unreachable=0    failed=0
+vm-web                     : ok=5    changed=2    unreachable=0    failed=0
+----
+
+You can see in the statistics that the handler was activated.
+
+The templated file includes the comment:
+
+----
+# Ansible managed: /root/workshop/templates/webapp.conf modified on 2014-02-04 17:59:32 by root on vm-master
+<VirtualHost *:80>
+    ServerName vm-web
+    DocumentRoot /var/www/html
+</VirtualHost>
 ----
 
 === Using with_items ===
@@ -514,7 +630,7 @@ Our web application uses MySQL. For managing MySQL databases with Ansible, the `
 The `item` variable contains the current item.
 
 ----
-[root@ws01 workshop]# ansible-playbook mysql.yml -i hosts
+[root@vm-master workshop]# ansible-playbook mysql.yml 
 
 PLAY [Configure MySQL] ******************************************************** 
 
@@ -525,10 +641,10 @@ TASK: [Install MySQL] *********************************************************
 ok: [vm-db] => (item=mysql-server,MySQL-python)
 
 TASK: [Start MySQL] *********************************************************** 
-ok: [vm-db]
+changed: [vm-db]
 
 PLAY RECAP ******************************************************************** 
-vm-db                       : ok=3    changed=0    unreachable=0    failed=0
+vm-db                      : ok=3    changed=1    unreachable=0    failed=0
 ----
 
 We want to be able to talk to MySQL in the web application we'll soon write in PHP. Use the `with_items` syntax to change the Apache installation playbook to install PHP and the MySQL extension.
@@ -544,7 +660,7 @@ We want to be able to talk to MySQL in the web application we'll soon write in P
 === Using results of previous tasks ===
 With the web server and the database up and running, we can start deploying the application.
 
-Let's first consider the case where the system is fresh. In that case we want to create a database and populate it with initial data. In subsequent reruns, we don't want to populate the database.
+Let's first consider the case where the system is fresh. In that case we want to create a database and populate it with initial data. In subsequent reruns, we don't want to populate the database again. We want it to keep the production data.
 
 ----
 - name: Prepare deployment
@@ -572,7 +688,7 @@ Let's first consider the case where the system is fresh. In that case we want to
     action: mysql_user name=ws host={{ hostvars[item]["ansible_ssh_host"] }} password=''
                        priv=ws.*:SELECT state=present
     with_items:
-    - groups["web-servers"]
+    - '{{ groups["web-servers"] }}'
 ----
 
 This introduces a few new modules.
@@ -581,7 +697,12 @@ We are mostly interested in the first `mysql_db` task. That task uses the `regis
 
 === Conditionals ===
 
-The last two tasks use the `when` keyword. A task will only run when the condition in `when` is true. In this case we use the built-in jinja2 filter `changed` to only run that task when the task that registered `db_create` did change the system.
+The next two tasks use the `when` keyword. A task will only run when the condition in `when` is true. In this case we use the built-in jinja2 filter `changed` to only run that task when the task that registered `db_create` did change the system.
+
+=== Magic Variables ===
+The last task introduces a few 'magic' variables. The `hostvars` dictionary contains the inventory variables for every host. Notice how we can use the `item` variable as the key in the `hostvars` dictionary.
+
+The argument to `with_items` is also templated. The `groups` variable is a dictionary that contains a list of hosts for every group.
 
 === Globbing files ===
 Now we can deploy the application. We will do it in a quick and dirty way, by just copying everything in a particular folder...
@@ -657,7 +778,7 @@ This makes our complete deployment playbook:
     action: mysql_user name=ws host={{ hostvars[item]["ansible_ssh_host"] }} password=''
                        priv=ws.*:SELECT state=present
     with_items:
-    - groups["web-servers"]
+    - '{{ groups["web-servers"] }}'
 
   - name: Copy initial schema
     action: copy src=app/db/initial.sql dest={{ db_dir }}/
@@ -687,47 +808,48 @@ This makes our complete deployment playbook:
     with_fileglob: app/web/*
 ----
 
-This playbook has three plays. They are run sequentially.
+This playbook has two plays that talk to different host groups. They are run sequentially.
 
 ----
-[root@ws01 workshop]# ansible-playbook deploy.yml -i hosts
+[root@vm-master workshop]# ansible-playbook deploy.yml 
 
 PLAY [Prepare deployment] ***************************************************** 
 
 GATHERING FACTS *************************************************************** 
-ok: [ws01]
+ok: [vm-db]
 
-TASK: [Create a temporary directory for database migrations] ******************* 
-ok: [ws01]
+TASK: [Create a temporary directory for database migrations] ****************** 
+changed: [vm-db]
 
 TASK: [Create the database] *************************************************** 
-ok: [ws01]
+changed: [vm-db]
+
+TASK: [Create a ws user] ****************************************************** 
+changed: [vm-db] => (item=vm-web)
 
 TASK: [Copy initial schema] *************************************************** 
-skipping: [ws01]
+changed: [vm-db]
 
 TASK: [Initialize database] *************************************************** 
-skipping: [ws01]
-
-PLAY [Update the database] **************************************************** 
-
-TASK: [Create a temporary directory for database migrations] ******************* 
-ok: [ws01]
+changed: [vm-db]
 
 TASK: [Upload database migrations] ******************************************** 
-ok: [ws01]
+changed: [vm-db]
 
 TASK: [Run database migrations] *********************************************** 
-changed: [ws01]
+changed: [vm-db]
 
 PLAY [Deploy the demo application] ******************************************** 
 
+GATHERING FACTS *************************************************************** 
+ok: [vm-web]
+
 TASK: [Copy all php scripts to the web server] ******************************** 
-ok: [ws01] => (item=/root/workshop/app/web/index.php)
+changed: [vm-web] => (item=/root/workshop/app/web/index.php)
 
 PLAY RECAP ******************************************************************** 
-ws01                       : ok=7    changed=1    unreachable=0    failed=0 
-----
+vm-db                      : ok=8    changed=7    unreachable=0    failed=0   
+vm-web                     : ok=2    changed=1    unreachable=0    failed=0
 
 === Ignoring errors ===
 
@@ -757,7 +879,7 @@ We will add a new directory under `/root` with a bare git repository (i.e. one w
 Run the new playbook:
 
 ----
-[root@ws01 workshop]# ansible-playbook auto-deploy.yml -i hosts
+[root@vm-master workshop]# ansible-playbook auto-deploy.yml 
 
 PLAY [Set up automatic application deployment repository] ********************* 
 
@@ -771,7 +893,7 @@ TASK: [Add post-receive hook to deploy] ***************************************
 changed: [vm-master]
 
 PLAY RECAP ******************************************************************** 
-vm-master                   : ok=4    changed=2    unreachable=0    failed=0
+vm-master                  : ok=3    changed=2    unreachable=0    failed=0
 ----
 
 Try to run it again.
@@ -797,13 +919,32 @@ Add the new repository as a remote of the current repository.
 $ git remote add deploy /root/deploy
 ----
 
-Now change the title of the application in `app/web/index.php`, commit and:
+Now commit all files (especially the deployment playbook) and push:
 
 ----
-root@ws01 workshop]# git add app/web/index.php
-[root@ws01 workshop]# git commit -v
-[master 8feb5ee] Update title.
- Committer: root <root@ws01.(none)>
+[root@vm-master workshop]# git status
+# On branch master
+# Changed but not updated:
+#   (use "git add <file>..." to update what will be committed)
+#   (use "git checkout -- <file>..." to discard changes in working directory)
+#
+#       modified:   hosts
+#
+# Untracked files:
+#   (use "git add <file>..." to include in what will be committed)
+#
+#       ansible.cfg
+#       apache.yml
+#       auto-deploy.yml
+#       config.yml
+#       deploy.yml
+#       mysql.yml
+#       templates/webapp.conf
+no changes added to commit (use "git add" and/or "git commit -a")
+[root@vm-master workshop]# git add hosts ansible.cfg apache.yml auto-deploy.yml config.yml deploy.yml mysql.yml templates/webapp.conf
+[root@vm-master workshop]# git commit -m "Prepare for deployment"
+[master 94350cd] Prepare for deployment
+ Committer: root <root@vm-master.(none)>
 Your name and email address were configured automatically based
 on your username and hostname. Please check that they are accurate.
 You can suppress this message by setting them explicitly:
@@ -815,14 +956,21 @@ If the identity used for this commit is wrong, you can fix it with:
 
     git commit --amend --author='Your Name <you@example.com>'
 
- 1 files changed, 1 insertions(+), 1 deletions(-)
-[root@ws01 workshop]# git push deploy master
-Counting objects: 9, done.
+ 8 files changed, 119 insertions(+), 3 deletions(-)
+ create mode 100644 ansible.cfg
+ create mode 100644 apache.yml
+ create mode 100644 auto-deploy.yml
+ create mode 100644 config.yml
+ create mode 100644 deploy.yml
+ create mode 100644 mysql.yml
+ create mode 100644 templates/webapp.conf
+[root@vm-master workshop]# git push deploy master
+Counting objects: 14, done.
 Delta compression using up to 2 threads.
-Compressing objects: 100% (4/4), done.
-Writing objects: 100% (5/5), 403 bytes, done.
-Total 5 (delta 2), reused 0 (delta 0)
-Unpacking objects: 100% (5/5), done.
+Compressing objects: 100% (9/9), done.
+Writing objects: 100% (11/11), 2.04 KiB, done.
+Total 11 (delta 0), reused 0 (delta 0)
+Unpacking objects: 100% (11/11), done.
 remote: Deploying Ansible Workshop Web Application
 remote: Initialized empty Git repository in /tmp/ws-deploy/.git/
 remote: 
@@ -837,16 +985,14 @@ remote:
 remote: TASK: [Create the database] *************************************************** 
 remote: ok: [vm-db]
 remote: 
+remote: TASK: [Create a ws user] ****************************************************** 
+remote: ok: [vm-db] => (item=vm-web)
+remote: 
 remote: TASK: [Copy initial schema] *************************************************** 
 remote: skipping: [vm-db]
 remote: 
 remote: TASK: [Initialize database] *************************************************** 
 remote: skipping: [vm-db]
-remote: 
-remote: PLAY [Update the database] **************************************************** 
-remote: 
-remote: TASK: [Create a temporary directory for database migrations] ****************** 
-remote: ok: [vm-db]
 remote: 
 remote: TASK: [Upload database migrations] ******************************************** 
 remote: ok: [vm-db]
@@ -856,12 +1002,16 @@ remote: changed: [vm-db]
 remote: 
 remote: PLAY [Deploy the demo application] ******************************************** 
 remote: 
+remote: GATHERING FACTS *************************************************************** 
+remote: ok: [vm-web]
+remote: 
 remote: TASK: [Copy all php scripts to the web server] ******************************** 
-remote: changed: [vm-web] => (item=/tmp/ws-deploy/app/web/index.php)
+remote: ok: [vm-web] => (item=/tmp/ws-deploy/app/web/index.php)
 remote: 
 remote: PLAY RECAP ******************************************************************** 
-remote: vm-db                       : ok=7    changed=2    unreachable=0    failed=0   
+remote: vm-db                      : ok=6    changed=1    unreachable=0    failed=0   
+remote: vm-web                     : ok=2    changed=0    unreachable=0    failed=0   
 remote: 
 To /root/deploy
-   7874de6..8feb5ee  master -> master
+   fde9e1c..94350cd  master -> master
 ----

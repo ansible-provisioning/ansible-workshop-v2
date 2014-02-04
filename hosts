@@ -1,8 +1,8 @@
 [workshop-hosts]
-192.168.122.1 ansible_python_interpreter=/usr/bin/python2
+hypervisor ansible_ssh_host=192.168.122.1 ansible_python_interpreter=/usr/bin/python2
 
 [vms]
-vm-master ansible_ssh_host=192.168.122.X on_host=192.168.122.1
+vm-master ansible_ssh_host=192.168.122.21 hypervisor=192.168.122.1
 vm-web ansible_ssh_host=192.168.122.Y
 vm-db  ansible_ssh_host=192.168.122.Z
 

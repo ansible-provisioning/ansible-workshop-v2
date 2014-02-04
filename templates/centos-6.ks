@@ -28,6 +28,8 @@ logvol /    --fstype=ext4 --name=lv_root --vgname=vg_{{ inventory_hostname }}_ro
 logvol swap --fstype=swap --name=lv_swap --vgname=vg_{{ inventory_hostname }}_root --size=512
 
 %packages --nobase
+-audit
+-audit-libs
 -b43-openfwwf
 -bridge-utils
 -device-mapper-multipath

@@ -3,7 +3,7 @@
 {% if memory is defined %}
     <memory>{{ memory|int * 1024 }}</memory>
 {% else %}
-    <memory>524288</memory>
+    <memory>2097252</memory>
 {% endif %}
 {% if cpu is defined %}
     <vcpu>{{ cpu }}</vcpu>

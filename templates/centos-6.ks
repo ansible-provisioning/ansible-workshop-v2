@@ -1,7 +1,7 @@
 network --bootproto=static --hostname={{ inventory_hostname }} --ip={{ ansible_ssh_host }} --netmask=255.255.255.0 --gateway={{ hypervisor }} --nameserver={{ hypervisor }}
-url --url={{ centos_mirror }}/centos/6/os/i386
-#repo --name=base    --baseurl={{ centos_mirror }}/centos/6/os/i386
-#repo --name=updates --baseurl={{ centos_mirror }}/centos/6/updates/i386
+url --url={{ centos_mirror }}/6/os/i386
+#repo --name=base    --baseurl={{ centos_mirror }}/6/os/i386
+#repo --name=updates --baseurl={{ centos_mirror }}/6/updates/i386
 
 services --enabled=network,postfix,rsyslog --disabled=httpd,iptables,ip6tables,mysqld,netfs,rawdevices
 
@@ -28,18 +28,81 @@ logvol /    --fstype=ext4 --name=lv_root --vgname=vg_{{ inventory_hostname }}_ro
 logvol swap --fstype=swap --name=lv_swap --vgname=vg_{{ inventory_hostname }}_root --size=512
 
 %packages --nobase
--audit
--audit-libs
+### Documentation
+-Deployment_Guide-en-US
+### Firmware
+-aic94xx-firmware
+-atmel-firmware
+-b43-fwcutter
 -b43-openfwwf
--bridge-utils
--device-mapper-multipath
--iptables-ipv6
--iscsi-initiator-utils
--prelink
+-bfa-firmware
+-ipw2100-firmware
+-ipw2200-firmware
+-ivtv-firmware
+-iw
+-iwl1000-firmware
+-iwl100-firmware
+-iwl3945-firmware
+-iwl4965-firmware
+-iwl5000-firmware
+-iwl5150-firmware
+-iwl6000-firmware
+-iwl6000g2a-firmware
+-iwl6050-firmware
+-libertas-usb8388-firmware
+-ql2100-firmware
+-ql2200-firmware
+-ql23xx-firmware
+-ql2400-firmware
+-ql2500-firmware
+-rt61pci-firmware
+-rt73usb-firmware
+-xorg-x11-drv-ati-firmware
+-zd1211-firmware
+### SELinux
+-checkpolicy
+-mcstrans
+-policycoreutils-python
 -selinux-policy
 -selinux-policy-targeted
+### RHN
+-rhn-check
+-rhn-client-tools
+-rhn-setup
+-rhnlib
+-rhnsd
+-subscription-manager
+-yum-rhn-plugin
+### Perl
+-perl
+-perl-DBI
+-perl-Module-Pluggable
+-perl-Pod-Escapes
+-perl-Pod-Simple
+-perl-libs
+-perl-version
+### Other
+-acl
+-attr
+-audit
+-authconfig
+-bridge-utils
+-cryptsetup-luks
+-cryptsetup-luks-libs
+-device-mapper-event
+-device-mapper-event-libs
+-device-mapper-multipath
+-device-mapper-multipath-libs
+-iptables-ipv6
+-iscsi-initiator-utils
+-kpartx
+-newt
+-newt-python
+-nfs-utils
+-nfs-utils-lib
+-prelink
+-setserial
 -system-config-firewall-base
-createrepo
 crontabs
 logrotate
 man
@@ -52,11 +115,11 @@ vixie-cron
 which
 yum
 vim-enhanced
-
+### Apache/PHP
 httpd
 php
 php-mysql
-
+### MySQL
 mysql-server
 MySQL-python
 %end

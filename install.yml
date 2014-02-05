@@ -1,6 +1,6 @@
 ---
 - name: Prepare host for provisioning
-  hosts: workshop-hosts
+  hosts: hypervisor
   user: root
 
   vars_files:
@@ -10,20 +10,20 @@
   - name: Create temporary directory
     action: file dest={{ pxe_dir }} state=directory
 
-  - name: Extract kernel and ramdisk from ISO image
-    action: iso_extract image={{ image_dir }}/{{ image_file }} files=images/pxeboot/{{ item }} dest={{ pxe_dir }}
+  - name: Copy kernel and initrd to host
+    action: get_url url={{ centos_mirror }}/6/os/i386/images/pxeboot/{{ item }} dest={{ pxe_dir }}/{{ item }}
     with_items:
     - vmlinuz
     - initrd.img
 
+
 - name: Provision a CentOS system
-  hosts: vms
+  hosts: vm-noname
   user: root
+  gather_facts: no ### The VM doesn't exist yet
 
   vars_files:
   - config.yml
-
-  gather_facts: no ### The VM doesn't exist yet
 
   tasks:
   - name: Create temporary directory
@@ -69,14 +69,6 @@
     action: wait_for host={{ ansible_ssh_host }} port=22 state=started
     delegate_to: "{{ hypervisor }}"
 
-- name: Configure yum
-  hosts: vms
-  user: root
-
-  vars_files:
-  - config.yml
-
-  tasks:
   - name: Configure CentOS mirror
     action: template src=templates/etc/yum.repos.d/CentOS-Base.repo dest=/etc/yum.repos.d/
 
@@ -87,16 +79,11 @@
     action: shell rpm -ivh /tmp/epel-release-6-8.noarch.rpm
     ignore_errors: yes
 
-- name: Install Ansible
-  hosts: vms
-  user: root
-
-  tasks:
   - name: Install packages
     action: yum pkg={{ item }} state=installed
     with_items:
-    - git
     - ansible
+    - git
 
   - name: Clone the workshop repository
     action: git repo=https://github.com/ansible-provisioning/workshop-deployment-participant.git
@@ -109,11 +96,6 @@
   - name: Copy SSH key to root
     action: copy src=ssh-keys/id_rsa.workshop dest=/root/.ssh/id_rsa mode=0600
 
-- name: Customize our image
-  hosts: vms
-  user: root
-
-  tasks:
   - name: Configure DHCP
     action: copy src=templates/etc/sysconfig/network-scripts/ifcfg-eth0
                  dest=/etc/sysconfig/network-scripts/ifcfg-eth0
@@ -135,15 +117,13 @@
                  dest=/etc/rc.d/rc.local
                  mode=0755
 
-- name: Convert and copy images
-  hosts: vms
-  user: root
-
-  tasks:
   - action: command poweroff
+
   - local_action: pause seconds=15
-  - action: fetch src=/var/lib/libvirt/images/{{ inventory_hostname }}.img
+
+  - action: fetch src={{ image_dir }}/{{ inventory_hostname }}.img
                   dest=./
                   flat=yes
     delegate_to: "{{ hypervisor }}"
+
   - local_action: command qemu-img convert -f qcow2 -O vmdk {{ inventory_hostname}}.img {{ inventory_hostname}}.vmdk

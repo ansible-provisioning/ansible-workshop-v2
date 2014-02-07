@@ -35,7 +35,7 @@
     delegate_to: "{{ hypervisor }}"
 
   - name: Allocate storage
-    action: qemu_img dest={{ image_dir }}/{{ inventory_hostname }}.img size=3072 format=qcow2
+    action: qemu_img dest={{ image_dir }}/{{ inventory_hostname }}.qcow2 size=3072 format=qcow2
     delegate_to: "{{ hypervisor }}"
 
   - name: Create the VM
@@ -112,18 +112,23 @@
                  state=link
                  mode=0644
 
-  - name: Set up console 11
-    action: copy src=templates/etc/rc.d/rc.local
-                 dest=/etc/rc.d/rc.local
+  - name: Copy Workshop configurator
+    action: copy src=workshop-config
+                 dest=/sbin/workshop-config
                  mode=0755
+
+  - name: Configure Workshop configurator
+    action: copy src=templates/etc/init/workshop.conf
+                 dest=/etc/init/workshop.conf
+                 mode=0644
 
   - action: command poweroff
 
   - local_action: pause seconds=15
 
-  - action: fetch src={{ image_dir }}/{{ inventory_hostname }}.img
+  - action: fetch src={{ image_dir }}/{{ inventory_hostname }}.qcow2
                   dest=./
                   flat=yes
     delegate_to: "{{ hypervisor }}"
 
-  - local_action: command qemu-img convert -f qcow2 -O vmdk {{ inventory_hostname}}.img {{ inventory_hostname}}.vmdk
+  - local_action: command qemu-img convert -f qcow2 -O vmdk {{ inventory_hostname}}.qcow2 {{ inventory_hostname}}.vmdk

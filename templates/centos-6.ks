@@ -96,13 +96,16 @@ logvol swap --fstype=swap --name=lv_swap --vgname=vg_{{ inventory_hostname }}_ro
 -iptables-ipv6
 -iscsi-initiator-utils
 -kpartx
--newt
--newt-python
 -nfs-utils
 -nfs-utils-lib
 -prelink
 -setserial
 -system-config-firewall-base
+### Workshop configurator
+newt
+newt-python
+python-ethtool
+### Minimal
 crontabs
 logrotate
 man

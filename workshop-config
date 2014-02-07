@@ -1,0 +1,75 @@
+#!/usr/bin/python
+import ethtool, fcntl, os, sys, termios, tty
+from snack import Entry, GridForm, Label, Listbox, SnackScreen
+
+def ipaddress():
+    for dev in ethtool.get_active_devices():
+        if (ethtool.get_flags(dev) & (ethtool.IFF_LOOPBACK | ethtool.IFF_POINTOPOINT)): continue
+        for addr in ethtool.get_interfaces_info(dev)[0].get_ipv4_addresses():
+            return addr.address
+    return '<unknown>'
+
+def set_tty(nr):
+    fd = open('/dev/tty%d' % nr, 'a')
+    old = termios.tcgetattr(fd)
+    new = termios.tcgetattr(fd)
+    new[0] = new[0] & ~termios.ICRNL
+    new[3] = new[3] & ~(termios.ICANON | termios.ECHO)
+    new[3] = new[3] | termios.ISIG
+    termios.tcsetattr(fd, termios.TCSAFLUSH, new)
+    tty.setraw(fd)
+    os.closerange(0, 3)
+    os.dup2(fd.fileno(), sys.stdin.fileno())
+    os.dup2(fd.fileno(), sys.stdout.fileno())
+    os.dup2(fd.fileno(), sys.stderr.fileno())
+
+def chvt(nr):
+    fd = open('/proc/self/fd/0')
+    fcntl.ioctl(fd, 0x00005606, nr)
+    fcntl.ioctl(fd, 0x00005607, nr)
+
+try:
+    tty_nr = int(sys.argv[1])
+except IndexError:
+    tty_nr = None
+except ValueError:
+    print >>sys.stderr, "ERROR: Argument %s is not a number" % sys.argv[1]
+    sys.exit(1)
+
+system = os.uname()[1].split('.')[0]
+names = ( 'vm-master', 'vm-web', 'vm-db', 'vm-syslog', 'vm-kdump' )
+
+if tty_nr != None:
+    set_tty(tty_nr)
+
+screen = SnackScreen()
+screen.drawRootText(17, 1, 'Welcome to the Ansible Workshop configurator !')
+screen.pushHelpLine('Change or select hostname')
+
+hostname = Entry(15, system)
+listbox = Listbox(height = len(names), width = 18, returnExit = 1)
+for nr, name in enumerate(names):
+    listbox.append(name, nr)
+    if name == system:
+        listbox.setCurrent(names.index(system))
+
+grid = GridForm(screen, "Virtual Machine", 1, 5)
+grid.add(Label('Hostname:'), 0, 2, anchorLeft=1)
+grid.add(hostname, 0, 3, anchorRight=1)
+grid.add(Label('IP Address:'), 0, 0, anchorLeft=1)
+grid.add(Label(ipaddress()), 0, 1, anchorRight=1)
+grid.add(listbox, 0, 4, padding=(0, 1, 0, 0))
+
+if tty_nr != None:
+    chvt(tty_nr)
+
+while True:
+    hostname.set(system)
+    result = grid.run()
+    system = names[listbox.current()]
+    try:
+        open('/proc/sys/kernel/hostname', 'w').write(system)
+        open('/etc/sysconfig/network', 'w').write('NETWORKING=yes\nHOSTNAME=%s\n' % system)
+        screen.pushHelpLine(' ')
+    except:
+        screen.pushHelpLine('Error changing system name')

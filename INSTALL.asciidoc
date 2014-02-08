@@ -7,4 +7,4 @@ v0.1, Feb 2014
 == Setup ==
 A virtual machine is provided. Log in using user `root` and password `root`. By default the IP address is 192.168.122.21. This is in the standard libvirtd default network.
 
-The virtual machine is created using Ansible. Run the `provision.yml` playbook to configure it. That playbook assumes the CentOS live installation image is available in `/var/lib/libvirt/images/` and a directory `/tmp/ks` is available through HTTP on port 8000. Use `$ python2 -m SimpleHTTPServer` to do that in an easy way.
+The virtual machine is created using Ansible and KVM. Run `ansible-playbook -i hosts install.yml` to configure it. That playbook requires that directory `/tmp/ks` is available through HTTP on port 8000. Use `$ cd /tmp/ks; python2 -m SimpleHTTPServer` to do that in an easy way.

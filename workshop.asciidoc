@@ -2,16 +2,10 @@ Ansible Workshop v2
 ===================
 
 Dag Wieers and Jeroen Hoekx
-v0.1, Feb 2014
+v0.2, March 2014
 
 == Introduction ==
-Slide presentation
-
-=== To be done ===
-
-=== Distributing virtual image ===
-
-=== Starting your virtual machines ===
+Slide presentation.
 
 
 == Ad-Hoc Commands ==
@@ -416,9 +410,9 @@ vm-web | success >> {
 When the fact you need is not in there, you can also return your own facts.
 
 === Under the hood ===
-Running the playbook with additional verbosity is possible with the +-v+ flag. Adding one +v+ show the output you would get when running a task with `ansible`.
+Running the playbook with additional verbosity is possible with the +-v+ flag. Adding one +-v+ shows the output you would get when running a task with `ansible`.
 
-Adding more +v+s, up to three, increases the verbosity. It shows you exactly which SSH commands are run in the background.
+Adding more +-v+'s, up to three, increases the verbosity. It shows you exactly which SSH commands are run in the background.
 
 ----
 [root@vm-master workshop]# ansible-playbook apache.yml -i hosts -vvv
@@ -850,6 +844,7 @@ changed: [vm-web] => (item=/root/workshop/app/web/index.php)
 PLAY RECAP ******************************************************************** 
 vm-db                      : ok=8    changed=7    unreachable=0    failed=0   
 vm-web                     : ok=2    changed=1    unreachable=0    failed=0
+----
 
 === Ignoring errors ===
 
@@ -912,7 +907,7 @@ fatal: The remote end hung up unexpectedly
 This is something in the Ansible git module that makes incorrect assumptions about bare repositories. It needs to be fixed, but it serves as a good example of the `ignore_errors` directive.
 
 
-=== PaaSy deployment ===
+=== PaaS deployment ===
 Add the new repository as a remote of the current repository.
 
 ----

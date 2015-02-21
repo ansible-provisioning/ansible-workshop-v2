@@ -1,8 +1,35 @@
 #!/usr/bin/python
+
+### This program is free software; you can redistribute it and/or
+### modify it under the terms of the GNU General Public License
+### as published by the Free Software Foundation; either version 2
+### of the License, or (at your option) any later version.
+###
+### This program is distributed in the hope that it will be useful,
+### but WITHOUT ANY WARRANTY; without even the implied warranty of
+### MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+### GNU General Public License for more details.
+###
+### You should have received a copy of the GNU General Public License
+### along with this program; if not, write to the Free Software
+### Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+### Copyright 2014 Dag Wieers <dag@wieers.com>
+
+### This tool is run on boot and provides a configuration window to
+### display the system's IP address and set the system's name.
+### This is useful when you have a basic image using DHCP which can
+### be cloned at will as many times to have a group of systems to
+### demo or learn a configuration system.
+
 import ethtool, fcntl, os, sys, termios, tty
 from snack import Entry, GridForm, Label, Listbox, SnackScreen
 
+names = ( 'vm-master', 'vm-web', 'vm-db', 'vm-syslog', 'vm-kdump' )
+system = os.uname()[1].split('.')[0]
+
 def ipaddress():
+    '''Return the first acceptable IP address'''
     for dev in ethtool.get_active_devices():
         if (ethtool.get_flags(dev) & (ethtool.IFF_LOOPBACK | ethtool.IFF_POINTOPOINT)): continue
         for addr in ethtool.get_interfaces_info(dev)[0].get_ipv4_addresses():
@@ -10,6 +37,7 @@ def ipaddress():
     return '<unknown>'
 
 def set_tty(nr):
+    '''Move application to a different console'''
     fd = open('/dev/tty%d' % nr, 'a')
     old = termios.tcgetattr(fd)
     new = termios.tcgetattr(fd)
@@ -24,6 +52,7 @@ def set_tty(nr):
     os.dup2(fd.fileno(), sys.stderr.fileno())
 
 def chvt(nr):
+    '''Change to a different console'''
     fd = open('/proc/self/fd/0')
     fcntl.ioctl(fd, 0x00005606, nr)
     fcntl.ioctl(fd, 0x00005607, nr)
@@ -35,9 +64,6 @@ except IndexError:
 except ValueError:
     print >>sys.stderr, "ERROR: Argument %s is not a number" % sys.argv[1]
     sys.exit(1)
-
-system = os.uname()[1].split('.')[0]
-names = ( 'vm-master', 'vm-web', 'vm-db', 'vm-syslog', 'vm-kdump' )
 
 if tty_nr != None:
     set_tty(tty_nr)

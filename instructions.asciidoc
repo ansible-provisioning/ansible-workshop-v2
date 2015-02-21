@@ -1,0 +1,108 @@
+= Instructions to prepare for the Ansible workshop
+:author: Dag Wieërs <dag@wieers.com>
+
+
+== Prerequisites
+Before we can start you need 3 things:
+
+ - A hypervisor like KVM, VirtualBox, VMware Player or VMware Fusion, Parallels Desktop
+ - A suitable VM image for your preferred hypervisor (QCOW2 and VMDK images are available)
+ - Sufficient free disk space for 3 VMs (about 1.5G per virtual machine should do)
+
+You can find the QCOW2 and VMDK images at: http://dag.wiee.rs/attic/ansible-workshop/
+
+
+== Setting up your virtual machines
+This document was only tested for the KVM and VirtualBox hypervisors, but it should work fine with other hypervisors provided that it supports either QCOW2 or VMDK images.
+
+Please test for your hypervisor of choice and contribute instructions back !
+
+
+=== KVM/Libvirt hypervisor (QCOW2)
+Perform the following actions:
+
+ - Copy the _vm-noname.qcow2_ to your default libvirt image directory, usually _/var/lib/libvirt/images/_
+ - Open Libvirt's "Virtual Machine Manager" and connect to *localhost (QEMU)*
+ - Right-click *localhost (QEMU)* and select *New*
+ - Provide the following information for the new VM:
+    * VM name: *vm-master*
+    * Installation type: *Import existing disk image*
+    * Existing storage path: *vm-noname.qcow2*
+    * OS type: *Linux*
+    * Version: *Red Hat Enterprise Linux 6*
+    * Memory (RAM) size: *512 MB*
+    * CPUs: *1*
+    * Network type: *Virtual network 'default': NAT*
+ - Do not start this new VM yet !!
+ - Clone this VM as *vm-web*
+ - Clone this VM again as *vm-db*
+
+
+=== VirtualBox hypervisor (VMDK)
+Perform the following actions:
+
+ - Copy the _vm-noname.vmdk_ to a location of your choice
+ - Start the "VirtualBox Manager"
+ - If not already available, create a Host-only Network *vboxnet0*:
+    * Go to *File > Preferences > Network > Host-only Networks*
+    * Click the *Add host-only network* button (network nic logo with plus sign)
+    * You should now have a *vboxnet0* network
+ - Click the *New* button to create a new VM:
+    * VM name: *vm-master*
+    * Type: *Linux*
+    * Version: *Red Hat (32bit)*
+    * Memory size: *512 MB*
+    * Select *Use an existing virtual hard drive file*
+    * Click the *Folder with up-arrow* button and select the VM image
+  - Do not start this new VM yet !!
+  - Clone this VM as *vm-web*
+    * Select *Reinitialize the MAC address of all network cards*
+  - Clone this VM again as *vm-db*
+    * Select *Reinitialize the MAC address of all network cards*
+
+
+=== Other hypervisors (VMDK)
+Most hypervisors can import VMDK files, so please use the VMDK image.
+
+Read the above instructions and try to perform them in a similar manner.
+
+If you would like to contribute to this document for other hypervisors, talk to me after the workshop !
+
+
+== Testing your new setup
+When you start all three VMs now, they will all show up with a text-interface to change the hostname of each VM. The interface will also display each VM's IP address on your internal network.
+
+Please change the hostname of each VM according to the VM name. This is not strictly necessary but will make things easier during the workshop.
+
+Test if you can log on as root via SSH to *vm-master* by using its IP address. The root password is *root*
+
+    $ ssh root@192.168.56.3
+    root@192.168.56.3's password: 
+    The authenticity of host '192.168.56.4 (192.168.56.3)' can't be established.
+    RSA key fingerprint is 2d:bf:84:22:39:fb:31:fa:af:31:bf:93:22:48:fb:d2.
+    Are you sure you want to continue connecting (yes/no)? yes
+    Warning: Permanently added '192.168.56.3' (RSA) to the list of known hosts.
+    Last login: Tue Mar 18  9:15:08 2014
+    [root@vm-master ~]# 
+
+If this worked, test if you can connect from *vm-master* to *vm-web* and *vm-db*. This should work without a password or passphrase prompt.
+
+    [root@vm-master ~]# ssh 192.168.56.4
+    The authenticity of host '192.168.56.4 (192.168.56.4)' can't be established.
+    RSA key fingerprint is af:31:bf:93:22:48:fb:d2:d7:0d:e0:7a:11:a6:4d:3d.
+    Are you sure you want to continue connecting (yes/no)? yes
+    Warning: Permanently added '192.168.56.4' (RSA) to the list of known hosts.
+    Last login: Tue Mar 18  9:16:13 2014
+    [root@vm-web ~]# logout
+    Connection to 192.168.56.4 closed.
+
+    [root@vm-master ~]# ssh 192.168.56.5
+    The authenticity of host '192.168.56.5 (192.168.56.5)' can't be established.
+    RSA key fingerprint is d3:d4:6a:11:a7:0e:d0:7d:2d:bf:84:22:39:fb:31:fa.
+    Are you sure you want to continue connecting (yes/no)? yes
+    Warning: Permanently added '192.168.56.5' (RSA) to the list of known hosts.
+    Last login: Tue Mar 18  9:16:44 2014
+    [root@vm-db ~]# logout
+    Connection to 192.168.56.5 closed.
+
+You can contact me at <dag@wieers.com> in case you have specific questions. If we cannot make it work beforehand, come to the workshop 30 minutes in advance and we will look into it together.

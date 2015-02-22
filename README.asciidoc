@@ -2,7 +2,7 @@ Ansible Workshop v2
 ===================
 
 Dag Wieers and Jeroen Hoekx
-v0.1, Feb 2014
+v0.2, Feb 2015
 
 == Introduction ==
 Teaching the basics of Ansible through application deployment is the goal of this workshop.
@@ -11,4 +11,4 @@ The workshop starts off with a short presentation explaining what Ansible is and
 
 After that an image is provided to have multiple virtual images which are used in the hands-on session that follows. This image is created with Ansible using the procedure in INSTALL.asciidoc.
 
-The hands-on session is explained in workshop.asciidoc.
+You can find preparation instructions for attendees in instructions.asciidoc and the hands-on session is explained in workshop.asciidoc.

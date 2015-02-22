@@ -24,7 +24,7 @@ vm-db ansible_ssh_host=192.168.122.Z
 You can see the IP address distributed by your hypervisor-specific DHCP on the console of each VM. Update the IP addresses to correspond with the ones the systems booted with.
 
 === Testing connectivity ===
-The most straightforward usage of Ansible it to run commands on remote hosts. The +ping+ module checks connectivity and correct python setup.
+The most straightforward usage of Ansible is to run commands on remote hosts. The +ping+ module checks connectivity and correct python setup.
 
 Let's assume our VM is remote and ping it.
 
@@ -109,7 +109,7 @@ vm-web | success >> {
 }
 ----
 
-The service module is one of the two distribution agnostic modules (with user). Package managers for example differ too much in their functionality to have one baseline module.
+The service module is a distribution agnostic modules (like the `user` module). Package managers for example differ too much in their functionality to have one baseline module.
 
 Another thing to notice is the `yes` argument to the `enabled` parameter. Boolean parameters in Ansible are `yes` and `no`.
 
@@ -136,7 +136,7 @@ Running commands on potentially hundreds of systems is nice, but it does not sca
 
 Playbooks are written in YAML. One playbook consists of one or more plays. Each play has a number of tasks. Playbooks are run sequentially. This allows orchestration of actions on multiple system groups.
 
-NOTE: Explain YAML here using slides
+NOTE: Explain YAML here using slides.
 
 === Creating your first playbook ===
 Let's show an example that ensures Apache is installed and running.
@@ -451,7 +451,7 @@ vm-web                     : ok=3    changed=0    unreachable=0    failed=0
 === Configuring a default inventory ===
 Up to now we've always used the +-i+ switch to the `ansible` and `ansible-playbook` commands. We can configure a default.
 
-Add a file `ansible.cfg` in the `/root/workshop/` directory with these contents:
+Add a file `ansible.cfg` in the `/root/workshop/` directory with this content:
 
 ----
 [root@vm-master workshop]# cat ansible.cfg 
@@ -522,7 +522,7 @@ PLAY RECAP ********************************************************************
 vm-web                     : ok=4    changed=1    unreachable=0    failed=0
 ----
 
-Of course, we would have wanted a restart of Apache to apply the new config. This can be done with handlers and notify. A handler is a normal named task that is run when the task that has it in notify returns changed.
+Of course, we would have wanted a restart of Apache to apply the new config. This can be done with handlers and notify. A handler is a named task. This task will be executed when it is notified by that is run when the task that has it in notify returns changed.
 
 Let's update the template and add a comment using the magic `ansible_managed` variable to it:
 
@@ -719,6 +719,8 @@ Now we can deploy the application. We will do it in a quick and dirty way, by ju
 ----
 
 This uses the `with_fileglob` lookup plugin, which provides exactly the functionality you'd expect it to have.
+
+NOTE: Explain the various lookup_plugins that already exist, and the extensibility of the `with_` keyword.
 
 === Including variables from files ===
 That last play feels wrong. We've defined the `webapp_dir` variable here. We also defined the variable in the Apache playbook. When the webapp location changes we have to remember to change it in two places.

@@ -1,5 +1,1 @@
-pxe_dir: /tmp/centos-pxe
-image_dir: /var/lib/libvirt/images
-web_dir: /tmp/ks ### serve this with $ python -m SimpleHTTPServer
 webapp_dir: /var/www/html
-centos_mirror: http://centos.cu.be/

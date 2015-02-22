@@ -1,73 +1,83 @@
 ---
-- name: Prepare host for provisioning
+- name: Ugly workaround for delegate_to bug in Ansible v1.8.4
   hosts: hypervisor
-  user: root
-
-  vars_files:
-  - config.yml
+  remote_user: root
 
   tasks:
-  - name: Create temporary directory
-    action: file dest={{ pxe_dir }} state=directory
+  - action: ping
 
-  - name: Copy kernel and initrd to host
-    action: get_url url={{ centos_mirror }}/6/os/i386/images/pxeboot/{{ item }} dest={{ pxe_dir }}/{{ item }}
-    with_items:
-    - vmlinuz
-    - initrd.img
-
-
-- name: Provision a CentOS system
+- name: Create virtual images for Workshop
   hosts: vm-noname
-  user: root
-  gather_facts: no ### The VM doesn't exist yet
+  remote_user: root
+  gather_facts: no
 
-  vars_files:
-  - config.yml
+  vars:
+    iso_image: boot.iso
+    iso_dir: /tmp/workshop/iso
+    kvm_dir: /tmp/workshop
+    image_dir: /var/lib/libvirt/images
+    centos_mirror: http://centos.cu.be/
 
   tasks:
+  - name: Revoke old keys
+    local_action: command ssh-keygen -R {{ ansible_ssh_host }}
+
   - name: Create temporary directory
-    action: file dest={{ pxe_dir }}/virt-{{ inventory_hostname }} state=directory
-    delegate_to: "{{ hypervisor }}"
+    local_action: file dest={{ iso_dir }} state=directory
+
+  - name: Template kickstart file
+    local_action: template src=templates/centos-6.ks dest={{ iso_dir }}/ks.cfg
+
+  - name: Template syslinux bootloader config
+    local_action: template src=templates/isolinux.cfg dest={{ iso_dir }}/isolinux.cfg
+
+  - name: Download boot images
+    local_action: get_url url={{ centos_mirror }}/6/os/i386/{{ item }} dest={{ iso_dir }}
+    with_items:
+    - images/pxeboot/vmlinuz
+    - images/pxeboot/initrd.img
+    - isolinux/isolinux.bin
+
+  - name: Create ISO boot image
+    local_action: command mkisofs -r -N -allow-leading-dots -d -J -T -b isolinux.bin -c boot.cat -no-emul-boot -V "Ansible workshop" -boot-load-size 4 -boot-info-table -o {{ iso_image }} {{ iso_dir }}
+
+  - name: Copy boot.iso to hypervisor
+    action: copy src={{ iso_image }} dest={{ image_dir }}/vm-noname.iso
+    delegate_to: hypervisor
 
   - name: Template VM configuration
-    action: template src=templates/vm.xml dest={{ pxe_dir }}/virt-{{ inventory_hostname }}/vm.xml
-    delegate_to: "{{ hypervisor }}"
+    action: template src=templates/vm.xml dest={{ kvm_dir }}/{{ inventory_hostname }}.xml
+    delegate_to: hypervisor
 
   - name: Allocate storage
     action: qemu_img dest={{ image_dir }}/{{ inventory_hostname }}.qcow2 size=3072 format=qcow2
-    delegate_to: "{{ hypervisor }}"
+    delegate_to: hypervisor
 
   - name: Create the VM
-    action: virt_guest guest={{ inventory_hostname }} src={{ pxe_dir }}/virt-{{ inventory_hostname }}/vm.xml
-    delegate_to: "{{ hypervisor }}"
+    action: virt_guest guest={{ inventory_hostname }} src={{ kvm_dir }}/{{ inventory_hostname }}.xml
+    delegate_to: hypervisor
 
-  - name: Template the kickstart file
-    action: template src=templates/centos-6.ks dest={{ web_dir }}/{{ inventory_hostname }}.ks mode=0755
-    delegate_to: "{{ hypervisor }}"
-
-  - name: Direct kernel boot the VM
-    action: virt_boot guest={{ inventory_hostname }} kernel={{ pxe_dir }}/vmlinuz initrd={{ pxe_dir }}/initrd.img cmdline='linux sshd ksdevice=eth0 ip={{ ansible_ssh_host }} netmask=255.255.255.0 gateway={{ hypervisor }} ks=http://{{ hypervisor }}:8000/{{ inventory_hostname }}.ks'
-    delegate_to: "{{ hypervisor }}"
+  - action: virt_boot guest={{ inventory_hostname }} boot=cdrom image={{ image_dir }}/vm-noname.iso
+    delegate_to: hypervisor
 
   - name: Wait for the VM to start
     action: wait_for host={{ ansible_ssh_host }} port=22 state=started
-    delegate_to: "{{ hypervisor }}"
+    delegate_to: hypervisor
 
   - name: Wait for the kickstart to finish
     action: wait_for host={{ ansible_ssh_host }} port=22 state=stopped timeout=7200
-    delegate_to: "{{ hypervisor }}"
+    delegate_to: hypervisor
 
   - name: Wait for the VM to stop
     local_action: pause seconds=15
 
   - name: Boot the VM from the hard disk
     action: virt_boot guest={{ inventory_hostname }} boot=hd
-    delegate_to: "{{ hypervisor }}"
+    delegate_to: hypervisor
 
   - name: Wait for the VM to boot
     action: wait_for host={{ ansible_ssh_host }} port=22 state=started
-    delegate_to: "{{ hypervisor }}"
+    delegate_to: hypervisor
 
   - name: Configure CentOS mirror
     action: template src=templates/etc/yum.repos.d/CentOS-Base.repo dest=/etc/yum.repos.d/
@@ -80,10 +90,13 @@
     ignore_errors: yes
 
   - name: Install packages
-    action: yum pkg={{ item }} state=installed
+    action: yum pkg={{ item }} enablerepo=epel-testing state=installed
     with_items:
     - ansible
     - git
+
+#  - name: Update system
+#    action: yum pkg=* state=latest
 
   - name: Clone the workshop repository
     action: git repo=https://github.com/ansible-provisioning/workshop-deployment-participant.git
@@ -129,6 +142,6 @@
   - action: fetch src={{ image_dir }}/{{ inventory_hostname }}.qcow2
                   dest=./
                   flat=yes
-    delegate_to: "{{ hypervisor }}"
+    delegate_to: hypervisor
 
   - local_action: command qemu-img convert -f qcow2 -O vmdk {{ inventory_hostname}}.qcow2 {{ inventory_hostname}}.vmdk

@@ -1,7 +1,7 @@
-network --bootproto=static --hostname={{ inventory_hostname }} --ip={{ ansible_ssh_host }} --netmask=255.255.255.0 --gateway={{ hypervisor }} --nameserver={{ hypervisor }}
+network --bootproto=static --hostname={{ inventory_hostname }} --ip={{ ansible_ssh_host }} --netmask=255.255.255.0 --gateway={{ hypervisor }} --nameserver={{ hypervisor }} --noipv6
 url --url={{ centos_mirror }}/6/os/i386
 #repo --name=base    --baseurl={{ centos_mirror }}/6/os/i386
-#repo --name=updates --baseurl={{ centos_mirror }}/6/updates/i386
+repo --name=updates --baseurl={{ centos_mirror }}/6/updates/i386
 
 services --enabled=network,postfix,rsyslog --disabled=httpd,iptables,ip6tables,mysqld,netfs,rawdevices
 
@@ -19,7 +19,7 @@ authconfig --enableshadow --passalgo=sha512
 selinux --disabled
 
 zerombr
-bootloader --location=mbr
+bootloader --location=mbr --append="noipv6"
 clearpart --all --initlabel
 part /boot  --fstype=ext4 --size=200 --fsoption=noatime
 part pv.1 --size 1 --grow

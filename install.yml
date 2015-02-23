@@ -2,9 +2,10 @@
 - name: Ugly workaround for delegate_to bug in Ansible v1.8.4
   hosts: hypervisor
   remote_user: root
+  gather_facts: no
 
   tasks:
-  - action: ping
+  - action: setup
 
 - name: Create virtual images for Workshop
   hosts: vm-noname
@@ -12,41 +13,42 @@
   gather_facts: no
 
   vars:
-    iso_image: boot.iso
-    iso_dir: /tmp/workshop/iso
-    kvm_dir: /tmp/workshop
-    image_dir: /var/lib/libvirt/images
+    os_name: centos
+    os_version: 6
+    os_arch: i386
     centos_mirror: http://centos.cu.be/
+    image_dir: /var/lib/libvirt/images
 
   tasks:
   - name: Revoke old keys
     local_action: command ssh-keygen -R {{ ansible_ssh_host }}
 
   - name: Create temporary directory
-    local_action: file dest={{ iso_dir }} state=directory
+    local_action: command mktemp -d /tmp/workshop.XXXXXXXXXX
+    register: tempdir
 
   - name: Template kickstart file
-    local_action: template src=templates/centos-6.ks dest={{ iso_dir }}/ks.cfg
+    local_action: template src=templates/ks-{{ os_name }}-{{ os_version }}.cfg dest={{ tempdir.stdout }}/ks.cfg
 
   - name: Template syslinux bootloader config
-    local_action: template src=templates/isolinux.cfg dest={{ iso_dir }}/isolinux.cfg
+    local_action: template src=templates/isolinux.cfg dest={{ tempdir.stdout }}/isolinux.cfg
 
   - name: Download boot images
-    local_action: get_url url={{ centos_mirror }}/6/os/i386/{{ item }} dest={{ iso_dir }}
+    local_action: get_url url={{ centos_mirror }}/{{ os_version }}/os/{{ os_arch }}/{{ item }} dest={{ tempdir.stdout }}
     with_items:
     - images/pxeboot/vmlinuz
     - images/pxeboot/initrd.img
     - isolinux/isolinux.bin
 
   - name: Create ISO boot image
-    local_action: command mkisofs -r -N -allow-leading-dots -d -J -T -b isolinux.bin -c boot.cat -no-emul-boot -V "Ansible workshop" -boot-load-size 4 -boot-info-table -o {{ iso_image }} {{ iso_dir }}
+    local_action: command mkisofs -r -N -allow-leading-dots -d -J -T -b isolinux.bin -c boot.cat -no-emul-boot -V "Ansible workshop" -boot-load-size 4 -boot-info-table -o boot.iso {{ tempdir.stdout }}
 
   - name: Copy boot.iso to hypervisor
-    action: copy src={{ iso_image }} dest={{ image_dir }}/vm-noname.iso
+    action: copy src=boot.iso dest={{ image_dir }}/vm-noname.iso
     delegate_to: hypervisor
 
   - name: Template VM configuration
-    action: template src=templates/vm.xml dest={{ kvm_dir }}/{{ inventory_hostname }}.xml
+    action: template src=templates/vm.xml dest={{ tempdir.stdout }}/{{ inventory_hostname }}.xml
     delegate_to: hypervisor
 
   - name: Allocate storage
@@ -54,40 +56,25 @@
     delegate_to: hypervisor
 
   - name: Create the VM
-    action: virt_guest guest={{ inventory_hostname }} src={{ kvm_dir }}/{{ inventory_hostname }}.xml
+    action: virt_guest guest={{ inventory_hostname }} src={{ tempdir.stdout }}/{{ inventory_hostname }}.xml
     delegate_to: hypervisor
 
-  - action: virt_boot guest={{ inventory_hostname }} boot=cdrom image={{ image_dir }}/vm-noname.iso
+  - name: Boot VM using boot ISO
+    action: virt_boot guest={{ inventory_hostname }} boot=cdrom image={{ image_dir }}/vm-noname.iso
     delegate_to: hypervisor
 
-  - name: Wait for the VM to start
-    action: wait_for host={{ ansible_ssh_host }} port=22 state=started
-    delegate_to: hypervisor
+  - name: Clean up temporary directory
+    local_action: file dest={{ tempdir.stdout }} state=absent
 
   - name: Wait for the kickstart to finish
-    action: wait_for host={{ ansible_ssh_host }} port=22 state=stopped timeout=7200
-    delegate_to: hypervisor
-
-  - name: Wait for the VM to stop
-    local_action: pause seconds=15
-
-  - name: Boot the VM from the hard disk
-    action: virt_boot guest={{ inventory_hostname }} boot=hd
-    delegate_to: hypervisor
-
-  - name: Wait for the VM to boot
-    action: wait_for host={{ ansible_ssh_host }} port=22 state=started
+    action: wait_for host={{ ansible_ssh_host }} port=22 state=started timeout=600
     delegate_to: hypervisor
 
   - name: Configure CentOS mirror
     action: template src=templates/etc/yum.repos.d/CentOS-Base.repo dest=/etc/yum.repos.d/
 
-  - name: Download EPEL
-    action: get_url url=http://epel.mirror.nucleus.be/6/i386/epel-release-6-8.noarch.rpm dest=/tmp/
-
   - name: Install EPEL
-    action: shell rpm -ivh /tmp/epel-release-6-8.noarch.rpm
-    ignore_errors: yes
+    action: shell rpm -ivh http://epel.mirror.nucleus.be/{{ os_version }}/{{ os_arch }}/epel-release-6-8.noarch.rpm
 
   - name: Install packages
     action: yum pkg={{ item }} enablerepo=epel-testing state=installed
@@ -135,13 +122,22 @@
                  dest=/etc/init/workshop.conf
                  mode=0644
 
-  - action: command poweroff
+  - name: Shut down system
+#    action: command virsh shutdown {{ inventory_hostname_short}}
+#    action: command service halt start
+    action: command pkill -INT init
 
-  - local_action: pause seconds=15
+  - name: Grace time for shutdown
+    local_action: pause seconds=8
 
-  - action: fetch src={{ image_dir }}/{{ inventory_hostname }}.qcow2
-                  dest=./
-                  flat=yes
+  - name: Power off system
+#    action: command poweroff
+    action: command virsh destroy {{ inventory_hostname_short}} --graceful
     delegate_to: hypervisor
 
-  - local_action: command qemu-img convert -f qcow2 -O vmdk {{ inventory_hostname}}.qcow2 {{ inventory_hostname}}.vmdk
+  - name: Download VM Qcow2 image
+    action: fetch src={{ image_dir }}/{{ inventory_hostname }}.qcow2 dest={{ inventory_hostname }}.qcow2.img flat=yes
+    delegate_to: hypervisor
+
+  - name: Convert Qcow2 image to VMDK
+    local_action: command qemu-img convert -f qcow2 -O vmdk {{ inventory_hostname}}.qcow2.img {{ inventory_hostname}}.vmdk.img

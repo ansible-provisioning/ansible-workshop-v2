@@ -123,17 +123,10 @@
                  mode=0644
 
   - name: Shut down system
-#    action: command virsh shutdown {{ inventory_hostname_short}}
-#    action: command service halt start
-    action: command pkill -INT init
+    action: file dest=/tmp/poweroff-ready state=touch
 
-  - name: Grace time for shutdown
-    local_action: pause seconds=8
-
-  - name: Power off system
-#    action: command poweroff
-    action: command virsh destroy {{ inventory_hostname_short}} --graceful
-    delegate_to: hypervisor
+  - name: Grace time for poweroff
+    local_action: pause seconds=10
 
   - name: Download VM Qcow2 image
     action: fetch src={{ image_dir }}/{{ inventory_hostname }}.qcow2 dest={{ inventory_hostname }}.qcow2.img flat=yes

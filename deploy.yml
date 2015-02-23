@@ -25,7 +25,7 @@
     when: db_create|changed
 
   - name: Create a ws user
-    action: mysql_user name=ws host={{ hostvars[item]["ansible_ssh_host"] }} password=''
+    action: mysql_user name=ws host={{ hostvars[item]["ansible_ssh_host"] }} password=""
                        priv=ws.*:SELECT state=present
     with_items:
     - '{{ groups["web-servers"] }}'

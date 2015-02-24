@@ -125,6 +125,10 @@
   - name: Shut down system
     action: file dest=/tmp/poweroff-ready state=touch
 
+  - name: Wait for the system to shut down
+    action: wait_for host={{ ansible_ssh_host }} port=22 state=stopped
+    delegate_to: hypervisor
+
   - name: Grace time for poweroff
     local_action: pause seconds=10
 

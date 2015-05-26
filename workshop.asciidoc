@@ -149,10 +149,10 @@ Let's show an example that ensures Apache is installed and running.
   tasks:
 
   - name: Install Apache
-    action: yum pkg=httpd state=installed
+    yum: pkg=httpd state=installed
 
   - name: Start and Enable Apache
-    action: service name=httpd state=started enabled=yes
+    service: name=httpd state=started enabled=yes
 ----
 
 This playbook has one play. In that play are two tasks.
@@ -477,13 +477,13 @@ Let's configure a virtual host on Apache for the web application we want to depl
   tasks:
 
   - name: Install Apache
-    action: yum pkg=httpd state=installed
+    yum: pkg=httpd state=installed
 
   - name: Add webapp vhost
-    action: template src=templates/webapp.conf dest=/etc/httpd/conf.d/
+    template: src=templates/webapp.conf dest=/etc/httpd/conf.d/
 
   - name: Start and Enable Apache
-    action: service name=httpd state=started enabled=yes
+    service: name=httpd state=started enabled=yes
 ----
 
 This playbook shows the template module. This module allows templating a configuration file using the jinja2 templating language (also used in Flask).
@@ -546,21 +546,21 @@ Add the handler to the playbook and use `notify` to register the handler.
 
   handlers:
 
-  - name: restart Apache
-    action: service name=httpd state=restarted
+  - name: restart-apache
+    service: name=httpd state=restarted
 
   tasks:
 
   - name: Install Apache
-    action: yum pkg=httpd state=installed
+    yum: pkg=httpd state=installed
 
   - name: Add webapp vhost
-    action: template src=templates/webapp.conf dest=/etc/httpd/conf.d/
+    template: src=templates/webapp.conf dest=/etc/httpd/conf.d/
     notify:
-    - restart Apache
+    - restart-apache
 
   - name: Start and Enable Apache
-    action: service name=httpd state=started enabled=yes
+    service: name=httpd state=started enabled=yes
 ----
 
 When we run it:
@@ -582,7 +582,7 @@ changed: [vm-web]
 TASK: [Start and Enable Apache] *********************************************** 
 ok: [vm-web]
 
-NOTIFIED: [restart Apache] **************************************************** 
+NOTIFIED: [restart-apache] **************************************************** 
 changed: [vm-web]
 
 PLAY RECAP ******************************************************************** 
@@ -612,13 +612,13 @@ Our web application uses MySQL. For managing MySQL databases with Ansible, the `
   tasks:
 
   - name: Install MySQL
-    action: yum pkg={{ item }} state=installed
+    yum: pkg={{ item }} state=installed
     with_items:
     - mysql-server
     - MySQL-python
 
   - name: Start MySQL
-    action: service name=mysqld state=started enabled=yes
+    service: name=mysqld state=started enabled=yes
 ----
 
 The `item` variable contains the current item.
@@ -645,7 +645,7 @@ We want to be able to talk to MySQL in the web application we'll soon write in P
 
 ----
   - name: Install Apache and PHP
-    action: yum pkg={{ item }} state=installed
+    yum: pkg={{ item }} state=installed
     with_items:
     - httpd
     - php-mysql
@@ -664,23 +664,23 @@ Let's first consider the case where the system is fresh. In that case we want to
   tasks:
 
   - name: Create a temporary directory for database migratons
-    action: file dest=/tmp/db state=directory
+    file: dest=/tmp/db state=directory
 
   - name: Create the database
-    action: mysql_db name=ws state=present
+    mysql_db: name=ws state=present
     register: db_create
 
   - name: Copy initial schema
-    action: copy src=app/db/initial.sql dest=/tmp/db/
+    copy: src=app/db/initial.sql dest=/tmp/db/
     when: db_create|changed
 
   - name: Initialize database
-    action: mysql_db name=ws state=import target=/tmp/db/initial.sql
+    mysql_db: name=ws state=import target=/tmp/db/initial.sql
     when: db_create|changed
 
   - name: Create a ws user
-    action: mysql_user name=ws host={{ hostvars[item]["ansible_ssh_host"] }} password=''
-                       priv=ws.*:SELECT state=present
+    mysql_user: name=ws host={{ hostvars[item]["ansible_ssh_host"] }} password=''
+                priv=ws.*:SELECT state=present
     with_items:
     - '{{ groups["web-servers"] }}'
 ----
@@ -712,9 +712,9 @@ Now we can deploy the application. We will do it in a quick and dirty way, by ju
   tasks:
 
   - name: Copy all php scripts to the web server
-    action: copy src={{ item }}
-                 dest={{ webapp_dir }}/
-                 owner=apache group=apache
+    copy: src={{ item }}
+          dest={{ webapp_dir }}/
+          owner=apache group=apache
     with_fileglob: app/web/*
 ----
 
@@ -738,7 +738,7 @@ There is a better solution: including variables from files.
   tasks:
 
   - name: Copy all php scripts to the web server
-    action: template src={{ item }} dest={{ webapp_dir }}/ owner=apache group=apache
+    template: src={{ item }} dest={{ webapp_dir }}/ owner=apache group=apache
     with_fileglob: app/web/*
 ----
 
@@ -764,31 +764,31 @@ This makes our complete deployment playbook:
   tasks:
 
   - name: Create a temporary directory for database migrations
-    action: file dest={{ db_dir }} state=directory
+    file: dest={{ db_dir }} state=directory
 
   - name: Create the database
-    action: mysql_db name=ws state=present
+    mysql_db: name=ws state=present
     register: db_create
 
   - name: Create a ws user
-    action: mysql_user name=ws host={{ hostvars[item]["ansible_ssh_host"] }} password=''
+    mysql_user: name=ws host={{ hostvars[item]["ansible_ssh_host"] }} password=''
                        priv=ws.*:SELECT state=present
     with_items:
     - '{{ groups["web-servers"] }}'
 
   - name: Copy initial schema
-    action: copy src=app/db/initial.sql dest={{ db_dir }}/
+    copy: src=app/db/initial.sql dest={{ db_dir }}/
     when: db_create|changed
 
   - name: Initialize database
-    action: mysql_db name=ws state=import target={{ db_dir }}/initial.sql
+    mysql_db: name=ws state=import target={{ db_dir }}/initial.sql
     when: db_create|changed
 
   - name: Upload database migrations
-    action: copy src=app/db/migrations.sql dest={{ db_dir }}/
+    copy: src=app/db/migrations.sql dest={{ db_dir }}/
 
   - name: Run database migrations
-    action: mysql_db name=ws state=import target={{ db_dir }}/migrations.sql
+    mysql_db: name=ws state=import target={{ db_dir }}/migrations.sql
 
 - name: Deploy the demo application
   hosts: web-servers
@@ -800,7 +800,7 @@ This makes our complete deployment playbook:
   tasks:
 
   - name: Copy all php scripts to the web server
-    action: template src={{ item }} dest={{ webapp_dir }}/ owner=apache group=apache
+    template: src={{ item }} dest={{ webapp_dir }}/ owner=apache group=apache
     with_fileglob: app/web/*
 ----
 
@@ -862,15 +862,15 @@ We will add a new directory under `/root` with a bare git repository (i.e. one w
   tasks:
 
   - name: Clone the workshop repository
-    action: git repo=/root/workshop
-                dest=/root/deploy
-                bare=yes
+    git: repo=/root/workshop
+         dest=/root/deploy
+         bare=yes
     ignore_errors: yes
 
   - name: Add post-receive hook to deploy
-    action: copy src=templates/post-receive
-                 dest=/root/deploy/hooks/
-                 mode=0755
+    copy: src=templates/post-receive
+          dest=/root/deploy/hooks/
+          mode=0755
 ----
 
 Run the new playbook:

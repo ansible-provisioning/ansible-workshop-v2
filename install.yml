@@ -5,7 +5,7 @@
   gather_facts: no
 
   tasks:
-  - action: setup
+  - setup:
 
 - name: Create virtual images for Workshop
   hosts: vm-noname
@@ -21,120 +21,132 @@
 
   tasks:
   - name: Revoke old keys
-    local_action: command ssh-keygen -R {{ ansible_ssh_host }}
+    command: ssh-keygen -R {{ ansible_ssh_host }}
+    transport: local
 
   - name: Create temporary directory
-    local_action: command mktemp -d /tmp/workshop.XXXXXXXXXX
+    command: mktemp -d /tmp/workshop.XXXXXXXXXX
+    transport: local
     register: tempdir
 
   - name: Template kickstart file
-    local_action: template src=templates/ks-{{ os_name }}-{{ os_version }}.cfg dest={{ tempdir.stdout }}/ks.cfg
+    template: src=templates/ks-{{ os_name }}-{{ os_version }}.cfg dest={{ tempdir.stdout }}/ks.cfg
+    transport: local
 
   - name: Template syslinux bootloader config
-    local_action: template src=templates/isolinux.cfg dest={{ tempdir.stdout }}/isolinux.cfg
+    template: src=templates/isolinux.cfg dest={{ tempdir.stdout }}/isolinux.cfg
+    transport: local
 
   - name: Download boot images
-    local_action: get_url url={{ centos_mirror }}/{{ os_version }}/os/{{ os_arch }}/{{ item }} dest={{ tempdir.stdout }}
+    get_url: url={{ centos_mirror }}/{{ os_version }}/os/{{ os_arch }}/{{ item }} dest={{ tempdir.stdout }}
+    transport: local
     with_items:
     - images/pxeboot/vmlinuz
     - images/pxeboot/initrd.img
     - isolinux/isolinux.bin
 
   - name: Create ISO boot image
-    local_action: command mkisofs -r -N -allow-leading-dots -d -J -T -b isolinux.bin -c boot.cat -no-emul-boot -V "Ansible workshop" -boot-load-size 4 -boot-info-table -o boot.iso {{ tempdir.stdout }}
+    command: mkisofs -r -N -allow-leading-dots -d -J -T -b isolinux.bin -c boot.cat -no-emul-boot -V "Ansible workshop" -boot-load-size 4 -boot-info-table -o boot.iso {{ tempdir.stdout }}
+    transport: local
 
   - name: Copy boot.iso to hypervisor
-    action: copy src=boot.iso dest={{ image_dir }}/vm-noname.iso
+    copy: src=boot.iso dest={{ image_dir }}/vm-noname.iso
     delegate_to: hypervisor
 
   - name: Template VM configuration
-    action: template src=templates/vm.xml dest={{ tempdir.stdout }}/{{ inventory_hostname }}.xml
+    template: src=templates/vm.xml dest={{ tempdir.stdout }}/{{ inventory_hostname }}.xml
     delegate_to: hypervisor
 
   - name: Allocate storage
-    action: qemu_img dest={{ image_dir }}/{{ inventory_hostname }}.qcow2 size=3072 format=qcow2
+    qemu_img: dest={{ image_dir }}/{{ inventory_hostname }}.qcow2 size=3072 format=qcow2
     delegate_to: hypervisor
 
   - name: Create the VM
-    action: virt_guest guest={{ inventory_hostname }} src={{ tempdir.stdout }}/{{ inventory_hostname }}.xml
+    virt_guest: guest={{ inventory_hostname }} src={{ tempdir.stdout }}/{{ inventory_hostname }}.xml
+    delegate_to: hypervisor
+
+  - name: Enable ip_forward on hypervisor
+    sysctl: name="net.ipv4.ip_forward" value=1 sysctl_set=yes
     delegate_to: hypervisor
 
   - name: Boot VM using boot ISO
-    action: virt_boot guest={{ inventory_hostname }} boot=cdrom image={{ image_dir }}/vm-noname.iso
+    virt_boot: guest={{ inventory_hostname }} boot=cdrom image={{ image_dir }}/vm-noname.iso
     delegate_to: hypervisor
 
   - name: Clean up temporary directory
-    local_action: file dest={{ tempdir.stdout }} state=absent
+    file: dest={{ tempdir.stdout }} state=absent
+    transport: local
 
   - name: Wait for the kickstart to finish
-    action: wait_for host={{ ansible_ssh_host }} port=22 state=started timeout=600
+    wait_for: host={{ ansible_ssh_host }} port=22 state=started timeout=600
     delegate_to: hypervisor
 
   - name: Configure CentOS mirror
-    action: template src=templates/etc/yum.repos.d/CentOS-Base.repo dest=/etc/yum.repos.d/
+    template: src=templates/etc/yum.repos.d/CentOS-Base.repo dest=/etc/yum.repos.d/
 
   - name: Install EPEL
-    action: shell rpm -ivh http://epel.mirror.nucleus.be/{{ os_version }}/{{ os_arch }}/epel-release-6-8.noarch.rpm
+    shell: rpm -ivh http://epel.mirror.nucleus.be/{{ os_version }}/{{ os_arch }}/epel-release-6-8.noarch.rpm
 
   - name: Install packages
-    action: yum pkg={{ item }} enablerepo=epel-testing state=installed
+    yum: pkg={{ item }} enablerepo=epel-testing state=installed
     with_items:
     - ansible
     - git
 
 #  - name: Update system
-#    action: yum pkg=* state=latest
+#    yum: pkg=* state=latest
 
   - name: Clone the workshop repository
-    action: git repo=https://github.com/ansible-provisioning/workshop-deployment-participant.git
-                dest=/root/workshop
+    git: repo=https://github.com/ansible-provisioning/workshop-deployment-participant.git
+         dest=/root/workshop
 
   - name: Clone the complete workshop repository
-    action: git repo=https://github.com/ansible-provisioning/ansible-workshop-v2.git
-                dest=/root/complete
+    git: repo=https://github.com/ansible-provisioning/ansible-workshop-v2.git
+         dest=/root/complete
 
   - name: Copy SSH key to root
-    action: copy src=ssh-keys/id_rsa.workshop dest=/root/.ssh/id_rsa mode=0600
+    copy: src=ssh-keys/id_rsa.workshop dest=/root/.ssh/id_rsa mode=0600
 
   - name: Configure DHCP
-    action: copy src=templates/etc/sysconfig/network-scripts/ifcfg-eth0
-                 dest=/etc/sysconfig/network-scripts/ifcfg-eth0
-                 mode=0644
+    copy: src=templates/etc/sysconfig/network-scripts/ifcfg-eth0
+          dest=/etc/sysconfig/network-scripts/ifcfg-eth0
+          mode=0644
 
   - name: Remove persistent udev rules
-    action: copy src=templates/etc/udev/rules.d/70-persistent-net.rules
-                 dest=/etc/udev/rules.d/70-persistent-net.rules
-                 mode=0644
+    copy: src=templates/etc/udev/rules.d/70-persistent-net.rules
+          dest=/etc/udev/rules.d/70-persistent-net.rules
+          mode=0644
 
   - name: Disable persistent udev rules generator
-    action: file src=/dev/null
-                 dest=/etc/udev/rules.d/75-persistent-net-generator.rules 
-                 state=link
-                 mode=0644
+    file: src=/dev/null
+          dest=/etc/udev/rules.d/75-persistent-net-generator.rules 
+          state=link
+          mode=0644
 
   - name: Copy Workshop configurator
-    action: copy src=workshop-config
-                 dest=/sbin/workshop-config
-                 mode=0755
+    copy: src=workshop-config
+          dest=/sbin/workshop-config
+          mode=0755
 
   - name: Configure Workshop configurator
-    action: copy src=templates/etc/init/workshop.conf
-                 dest=/etc/init/workshop.conf
-                 mode=0644
+    copy: src=templates/etc/init/workshop.conf
+          dest=/etc/init/workshop.conf
+          mode=0644
 
   - name: Shut down system
-    action: file dest=/tmp/poweroff-ready state=touch
+    file: dest=/tmp/poweroff-ready state=touch
 
   - name: Wait for the system to shut down
-    action: wait_for host={{ ansible_ssh_host }} port=22 state=stopped
+    wait_for: host={{ ansible_ssh_host }} port=22 state=stopped
     delegate_to: hypervisor
 
   - name: Grace time for poweroff
-    local_action: pause seconds=10
+    pause: seconds=10
 
   - name: Download VM Qcow2 image
-    action: fetch src={{ image_dir }}/{{ inventory_hostname }}.qcow2 dest={{ inventory_hostname }}.qcow2.img flat=yes
+    fetch: src={{ image_dir }}/{{ inventory_hostname }}.qcow2 dest={{ inventory_hostname }}.qcow2.img flat=yes
     delegate_to: hypervisor
 
   - name: Convert Qcow2 image to VMDK
-    local_action: command qemu-img convert -f qcow2 -O vmdk {{ inventory_hostname}}.qcow2.img {{ inventory_hostname}}.vmdk.img
+    command: qemu-img convert -f qcow2 -O vmdk {{ inventory_hostname}}.qcow2.img {{ inventory_hostname}}.vmdk.img
+    transport: local

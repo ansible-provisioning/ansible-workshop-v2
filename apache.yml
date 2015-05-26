@@ -9,21 +9,21 @@
 
   handlers:
 
-  - name: restart Apache
-    action: service name=httpd state=restarted
+  - name: restart-apache
+    service: name=httpd state=restarted
 
   tasks:
 
   - name: Install Apache and PHP
-    action: yum pkg={{ item }} state=installed
+    yum: pkg={{ item }} state=installed
     with_items:
     - httpd
     - php-mysql
 
   - name: Add webapp vhost
-    action: template src=templates/etc/httpd/conf.d/webapp.conf dest=/etc/httpd/conf.d/
+    template: src=templates/etc/httpd/conf.d/webapp.conf dest=/etc/httpd/conf.d/
     notify:
-    - restart Apache
+    - restart-apache
 
   - name: Start Apache
-    action: service name=httpd state=started enabled=yes
+    service: name=httpd state=started enabled=yes

@@ -7,10 +7,10 @@
   tasks:
 
   - name: Install MySQL
-    action: yum pkg={{ item }} state=installed
+    yum: pkg={{ item }} state=installed
     with_items:
     - mysql-server
     - MySQL-python
 
   - name: Start MySQL
-    action: service name=mysqld state=started enabled=yes
+    service: name=mysqld state=started enabled=yes

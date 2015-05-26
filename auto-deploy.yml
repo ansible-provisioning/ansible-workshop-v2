@@ -7,12 +7,12 @@
   tasks:
 
   - name: Clone the workshop repository
-    action: git repo=/root/workshop
-                dest=/root/deploy
-                bare=yes
+    git: repo=/root/workshop
+         dest=/root/deploy
+         bare=yes
     ignore_errors: yes
 
   - name: Add post-receive hook to deploy
-    action: copy src=templates/post-receive
-                 dest=/root/deploy/hooks/
-                 mode=0755
+    copy: src=templates/post-receive
+          dest=/root/deploy/hooks/
+          mode=0755

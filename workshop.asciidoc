@@ -113,6 +113,30 @@ The service module is a distribution agnostic modules (like the `user` module). 
 
 Another thing to notice is the `yes` argument to the `enabled` parameter. Boolean parameters in Ansible are `yes` and `no`.
 
+=== Module Parameters ===
+There are more parameters to a module than you would expect. An easy way to learn about a module is to use the `ansible-doc` command:
+
+----
+[root@vm-master workshop]# ansible-doc service
+> SERVICE
+
+  Controls services on remote hosts. Supported init systems include
+  BSD init, OpenRC, SysV, Solaris SMF, systemd, upstart.
+
+Options (= is mandatory):
+
+- arguments
+        Additional arguments provided on the command line
+
+- enabled
+        Whether the service should start on boot. *At least one of
+        state and enabled are required.* (Choices: yes, no)
+
+= name
+        Name of the service.
+...
+----
+
 == Inventory Groups ==
 The application we want to deploy is multi-tiered. There is the web server part and the database part. It makes sense to be able to group hosts in functional groups.
 

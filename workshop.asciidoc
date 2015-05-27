@@ -2,7 +2,7 @@ Ansible Workshop v2
 ===================
 
 Dag Wieers and Jeroen Hoekx
-v0.2, March 2014
+v0.4, May 2015
 
 == Introduction ==
 Slide presentation.
@@ -13,6 +13,7 @@ Slide presentation.
 === Using an inventory ===
 Ansible only talks to hosts you want it to talk to. Those hosts are defined in an inventory file.
 
+.Example: Modified file "hosts"
 ----
 [ansible@ws01 workshop]$ cat hosts
 [vms]
@@ -28,6 +29,7 @@ The most straightforward usage of Ansible is to run commands on remote hosts. Th
 
 Let's assume our VM is remote and ping it.
 
+.Example: Ping a system using Ansible ad-hoc commands
 ----
 [root@vm-master workshop]# ansible vm-master -m ping -i hosts
 vm-master | success >> {
@@ -42,6 +44,7 @@ We only want to run it on the local host, so we choose +vm-master+ as selector. 
 
 We can run this command on multiple hosts by using the group in the inventory:
 
+.Example: Ping your VMs using Ansible ad-hoc commands
 ----
 [root@vm-master workshop]# ansible vms -m ping -i hosts
 vm-master | success >> {
@@ -65,6 +68,7 @@ vm-db| success >> {
 === The command module ===
 The `ping` module is useful for testing things, but let's run a generic command on all systems:
 
+.Example: Run a command on all your VMs
 ----
 [root@vm-master workshop]# ansible vms -m command -a 'date' -i hosts 
 vm-master | success | rc=0 >>
@@ -82,6 +86,7 @@ That uses the +command+ module and gives it arguments with +-a+.
 === Installing packages ===
 The goal of this workshop is to deploy a web application. A useful thing to have in that situation is a web server. Let's use Ansible to make sure Apache is installed and started. This introduces the `yum` and `service` modules.
 
+.Example: All your VMs are belong to us
 ----
 [root@vm-master workshop]# ansible vm-web -m yum -a 'pkg=httpd state=installed' -i hosts
 vm-web | success >> {
@@ -99,6 +104,7 @@ Great. Apache was already installed on the system. Notice the arguments to the `
 === Starting System Services ===
 Let's start Apache.
 
+.Example: Enable services using the service module
 ----
 [root@vm-master workshop]# ansible vm-web -m service -a 'name=httpd state=started enabled=yes' -i hosts
 vm-web | success >> {
@@ -116,6 +122,7 @@ Another thing to notice is the `yes` argument to the `enabled` parameter. Boolea
 === Module Parameters ===
 There are more parameters to a module than you would expect. An easy way to learn about a module is to use the `ansible-doc` command:
 
+.Example: Find module documentation on your system
 ----
 [root@vm-master workshop]# ansible-doc service
 > SERVICE
@@ -142,6 +149,7 @@ The application we want to deploy is multi-tiered. There is the web server part 
 
 The built-in inventory can do that:
 
+.Example: Modified file "hosts"
 ----
 [vms]
 vm-master ansible_ssh_host=192.168.122.X
@@ -165,6 +173,7 @@ NOTE: Explain YAML here using slides.
 === Creating your first playbook ===
 Let's show an example that ensures Apache is installed and running.
 
+.Example: Create new file "apache.yml"
 ----
 - name: Configure Apache
   hosts: web-servers
@@ -187,6 +196,7 @@ We've updated the `hosts` file to include a second group `web-servers`. Our `vm-
 
 You can run a playbook like this:
 
+.Example: apache.yml playbook output
 ----
 [root@vm-master workshop]# ansible-playbook apache.yml -i hosts 
 
@@ -211,6 +221,7 @@ You will notice this playbook runs both tasks and has an additional step to gath
 
 Let's see which facts are available. The +setup+ module is used to gather them.
 
+.Example: facts output using the setup module
 ----
 [root@ws01 workshop]# ansible vm-web -m setup -i hosts 
 vm-web | success >> {
@@ -438,6 +449,7 @@ Running the playbook with additional verbosity is possible with the +-v+ flag. A
 
 Adding more +-v+'s, up to three, increases the verbosity. It shows you exactly which SSH commands are run in the background.
 
+.Example: apache.yml playbook output
 ----
 [root@vm-master workshop]# ansible-playbook apache.yml -i hosts -vvv
 
@@ -477,6 +489,7 @@ Up to now we've always used the +-i+ switch to the `ansible` and `ansible-playbo
 
 Add a file `ansible.cfg` in the `/root/workshop/` directory with this content:
 
+.Example: Content of "ansible.cfg"
 ----
 [root@vm-master workshop]# cat ansible.cfg 
 [defaults]
@@ -490,6 +503,7 @@ When managing configuration files you often want to use certain variables in you
 
 Let's configure a virtual host on Apache for the web application we want to deploy.
 
+.Example: Modifications to file "apache.yml"
 ----
 - name: Configure Apache
   hosts: web-servers
@@ -514,6 +528,7 @@ This playbook shows the template module. This module allows templating a configu
 
 The template is simple. It looks like this:
 
+.Example: Create new file "templates/webapp.conf"
 ----
 <VirtualHost *:80>
     ServerName {{ inventory_hostname }}
@@ -525,6 +540,7 @@ We use our newly defined `webapp_dir` variable and a magic `inventory_hostname` 
 
 When you run it, the output is:
 
+.Example: apache.yml playbook output
 ----
 [root@vm-master workshop]# ansible-playbook apache.yml 
 
@@ -550,6 +566,7 @@ Of course, we would have wanted a restart of Apache to apply the new config. Thi
 
 Let's update the template and add a comment using the magic `ansible_managed` variable to it:
 
+.Modified file "templates/webapp.conf"
 ----
 # {{ ansible_managed }}
 <VirtualHost *:80>
@@ -558,8 +575,11 @@ Let's update the template and add a comment using the magic `ansible_managed` va
 </VirtualHost>
 ----
 
+NOTE: An easy way to test for changes is to use the `--check` option when using `ansible-playbook`, this will pretend to be running the playbook while not making any direct changes to the target systems. Additionally, you can use the `--diff` option to see what changes are being made on target systems so you can visually verify that what is happening is what is to be expected (using diff output).
+
 Add the handler to the playbook and use `notify` to register the handler.
 
+.Modified file "apache.yml"
 ----
 - name: Configure Apache
   hosts: web-servers
@@ -589,6 +609,7 @@ Add the handler to the playbook and use `notify` to register the handler.
 
 When we run it:
 
+.Example: apache.yml playbook output
 ----
 [root@vm-master workshop]# ansible-playbook apache.yml 
 
@@ -617,6 +638,7 @@ You can see in the statistics that the handler was activated.
 
 The templated file includes the comment:
 
+.Example: Templated file "/etc/httpd/conf.d/webapp.conf"
 ----
 # Ansible managed: /root/workshop/templates/webapp.conf modified on 2014-02-04 17:59:32 by root on vm-master
 <VirtualHost *:80>
@@ -628,6 +650,7 @@ The templated file includes the comment:
 === Using with_items ===
 Our web application uses MySQL. For managing MySQL databases with Ansible, the `MySQL-Python` module is needed. We could use two tasks to install MySQL and the python module, but there is some syntactic sugar that helps.
 
+.Example: Create new file "mysql.yml"
 ----
 - name: Configure MySQL
   hosts: database-servers
@@ -647,6 +670,7 @@ Our web application uses MySQL. For managing MySQL databases with Ansible, the `
 
 The `item` variable contains the current item.
 
+.Example: mysql.yml playbook output
 ----
 [root@vm-master workshop]# ansible-playbook mysql.yml 
 
@@ -667,6 +691,7 @@ vm-db                      : ok=3    changed=1    unreachable=0    failed=0
 
 We want to be able to talk to MySQL in the web application we'll soon write in PHP. Use the `with_items` syntax to change the Apache installation playbook to install PHP and the MySQL extension.
 
+.Example: Additions to file "apache.yml"
 ----
   - name: Install Apache and PHP
     yum: pkg={{ item }} state=installed
@@ -680,6 +705,7 @@ With the web server and the database up and running, we can start deploying the 
 
 Let's first consider the case where the system is fresh. In that case we want to create a database and populate it with initial data. In subsequent reruns, we don't want to populate the database again. We want it to keep the production data.
 
+.Example: Create new file "deploy.yml"
 ----
 - name: Prepare deployment
   hosts: database-servers
@@ -725,6 +751,7 @@ The argument to `with_items` is also templated. The `groups` variable is a dicti
 === Globbing files ===
 Now we can deploy the application. We will do it in a quick and dirty way, by just copying everything in a particular folder...
 
+.Example: Additions to file "deploy.yml"
 ----
 - name: Deploy the demo application
   hosts: web-servers
@@ -751,6 +778,7 @@ That last play feels wrong. We've defined the `webapp_dir` variable here. We als
 
 There is a better solution: including variables from files.
 
+.Example: Modifications in file "deploy.yml"
 ----
 - name: Deploy the demo application
   hosts: web-servers
@@ -762,12 +790,15 @@ There is a better solution: including variables from files.
   tasks:
 
   - name: Copy all php scripts to the web server
-    template: src={{ item }} dest={{ webapp_dir }}/ owner=apache group=apache
+    template: src={{ item }}
+              dest={{ webapp_dir }}/
+              owner=apache group=apache
     with_fileglob: app/web/*
 ----
 
 `config.yml` contains:
 
+.Example: Create new file "config.yml"
 ----
 webapp_dir: /var/www/html
 ----
@@ -777,6 +808,7 @@ Application developers have the nasty habit of not being able to come up with a 
 
 This makes our complete deployment playbook:
 
+.Example: Final file "deploy.yml"
 ----
 - name: Prepare deployment
   hosts: database-servers
@@ -830,6 +862,7 @@ This makes our complete deployment playbook:
 
 This playbook has two plays that talk to different host groups. They are run sequentially.
 
+.Example: deploy.yml playbook output
 ----
 [root@vm-master workshop]# ansible-playbook deploy.yml 
 
@@ -878,6 +911,7 @@ We can now deploy applications from our management system, which could be you CI
 
 We will add a new directory under `/root` with a bare git repository (i.e. one without working tree). A git post-receive hook runs the application whenever you push to the repository.
 
+.Example: New file "auto-deploy.yml"
 ----
 - name: Set up automatic application deployment repository
   hosts: vm-master
@@ -899,6 +933,7 @@ We will add a new directory under `/root` with a bare git repository (i.e. one w
 
 Run the new playbook:
 
+.Example: auto-deploy.yml playbook output
 ----
 [root@vm-master workshop]# ansible-playbook auto-deploy.yml 
 
@@ -919,6 +954,7 @@ vm-master                  : ok=3    changed=2    unreachable=0    failed=0
 
 Try to run it again.
 
+.Example: auto-deploy.yml playbook output
 ----
 TASK: [Clone the workshop repository] ***************************************** 
 failed: [ws01] => {"cmd": "/usr/bin/git ls-remote origin -h refs/heads/master", "failed": true, "rc": 128}
@@ -936,12 +972,14 @@ This is something in the Ansible git module that makes incorrect assumptions abo
 === PaaS deployment ===
 Add the new repository as a remote of the current repository.
 
+.Example: Git command to add deploy remote
 ----
 $ git remote add deploy /root/deploy
 ----
 
 Now commit all files (especially the deployment playbook) and push:
 
+.Example: Git commands to push content
 ----
 [root@vm-master workshop]# git status
 # On branch master

@@ -55,6 +55,7 @@ Perform the following actions:
     * Select *Use an existing virtual hard drive file*
     * Click the *Folder with up-arrow* button and select the VM image
   - Do not start this new VM yet !!
+  - Go to *Settings > Network* and select the Host-only Network Adapter *vboxnet0*
   - Clone this VM as *vm-web*
     * Select *Reinitialize the MAC address of all network cards*
   - Clone this VM again as *vm-db*

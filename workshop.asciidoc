@@ -163,12 +163,14 @@ vm-web
 vm-db
 ----
 
+NOTE: The simple inventory format is quite limited, especially when managing large inventories. If you plan on using Ansible for a large environment, you probably want to look into inventory scripts. Inventory scripts can access external sources (database, DNS, network inventories, Satellite, CMDB) and merge information from different sources. The sky is the limit...
+
 == Playbooks ==
 Running commands on potentially hundreds of systems is nice, but it does not scale as your infrastructure grows. We need a way to describe the system state. Ansible playbooks provide a declarative way to do just that.
 
 Playbooks are written in YAML. One playbook consists of one or more plays. Each play has a number of tasks. Playbooks are run sequentially. This allows orchestration of actions on multiple system groups.
 
-NOTE: Explain YAML here using slides.
+NOTE: YAML is a simple language that describes data, much like XML but for humans. JSON is a basis of YAML version 1.2, so you can use JSON style structures within a YAML document. YAML takes some time to get used to and, much like python, indenting is important for structuring data. A very good summary of what YAML is about is available from the example at Wikipedia.org: http://en.wikipedia.org/wiki/YAML[]
 
 === Creating your first playbook ===
 Let's show an example that ensures Apache is installed and running.
@@ -192,9 +194,7 @@ This playbook has one play. In that play are two tasks.
 
 A play always indicates on which hosts it will run and as what user. Many more parameters are possible, but this is the minimum. Well, you could skip the user, but then it will run as your local user.
 
-We've updated the `hosts` file to include a second group `web-servers`. Our `vm-web` system is in that group.
-
-You can run a playbook like this:
+We've updated the `hosts` file to include a second group `web-servers`. Our `vm-web` system is in that group. Now let's run this playbook to see what happens:
 
 .Example: apache.yml playbook output
 ----
@@ -235,19 +235,6 @@ vm-web | success >> {
         "ansible_architecture": "i386", 
         "ansible_bios_date": "01/01/2011", 
         "ansible_bios_version": "Bochs", 
---snip--
-        }, 
-        "ansible_default_ipv4": {
-            "address": "192.168.122.21", 
-            "alias": "eth0", 
-            "gateway": "192.168.122.1", 
-            "interface": "eth0", 
-            "macaddress": "52:54:00:23:16:14", 
-            "mtu": 1500, 
-            "netmask": "255.255.255.0", 
-            "network": "192.168.122.0", 
-            "type": "ether"
-        }, 
 --snip--
         "ansible_distribution": "CentOS", 
         "ansible_distribution_release": "Final", 
@@ -298,7 +285,7 @@ vm-web | success >> {
 }
 ----
 
-When the fact you need is not in there, you can also return your own facts.
+When the fact you need is not in there, you can also return your own facts in various ways.
 
 === Under the hood ===
 Running the playbook with additional verbosity is possible with the +-v+ flag. Adding one +-v+ shows the output you would get when running a task with `ansible`.

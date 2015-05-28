@@ -1,8 +1,14 @@
 = Instructions to prepare for the Ansible workshop
 :author: Dag Wieërs <dag@wieers.com>
+:doctype: article
 
 
-== Prerequisites
+== Setting up your virtual machines
+This document was only tested for the KVM and VirtualBox hypervisors, but it should work fine with other hypervisors provided that it supports either QCOW2 or VMDK images.
+
+Please test for your hypervisor of choice and contribute instructions back !
+
+=== Prerequisites
 Before we can start you need 3 things:
 
  - A hypervisor like KVM, VirtualBox, VMware Player or VMware Fusion, Parallels Desktop
@@ -10,12 +16,6 @@ Before we can start you need 3 things:
  - Sufficient free disk space for 3 VMs (about 1.5G per virtual machine should do)
 
 You can find the QCOW2 and VMDK images at: http://dag.wiee.rs/attic/ansible-workshop/
-
-
-== Setting up your virtual machines
-This document was only tested for the KVM and VirtualBox hypervisors, but it should work fine with other hypervisors provided that it supports either QCOW2 or VMDK images.
-
-Please test for your hypervisor of choice and contribute instructions back !
 
 
 === KVM/Libvirt hypervisor (QCOW2)

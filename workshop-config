@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 ### This program is free software; you can redistribute it and/or
 ### modify it under the terms of the GNU General Public License
@@ -27,13 +27,16 @@ from snack import Entry, GridForm, Label, Listbox, SnackScreen
 
 names = ( 'vm-master', 'vm-web', 'vm-db', 'vm-syslog', 'vm-kdump' )
 system = os.uname()[1].split('.')[0]
+domain = 'example.net'
 
 def ipaddress():
-    '''Return the first acceptable IP address'''
+    '''Return the first acceptable IP address on the hostonly network'''
     for dev in ethtool.get_active_devices():
-        if (ethtool.get_flags(dev) & (ethtool.IFF_LOOPBACK | ethtool.IFF_POINTOPOINT)): continue
+        if (ethtool.get_flags(dev) & (ethtool.IFF_LOOPBACK | ethtool.IFF_POINTOPOINT)):
+            continue
         for addr in ethtool.get_interfaces_info(dev)[0].get_ipv4_addresses():
             return addr.address
+
     return '<unknown>'
 
 def set_tty(nr):
@@ -95,7 +98,8 @@ while True:
     system = names[listbox.current()]
     try:
         open('/proc/sys/kernel/hostname', 'w').write(system)
-        open('/etc/sysconfig/network', 'w').write('NETWORKING=yes\nHOSTNAME=%s\n' % system)
-        screen.pushHelpLine(' ')
+        open('/etc/sysconfig/network', 'w').write('NETWORKING=yes\nHOSTNAME=%s.%s\n' % (system, domain))
+        open('/etc/hostname', 'w').write('%s.%s\n' % (system, domain))
+        screen.pushHelpLine('Configured!')
     except:
         screen.pushHelpLine('Error changing system name')
